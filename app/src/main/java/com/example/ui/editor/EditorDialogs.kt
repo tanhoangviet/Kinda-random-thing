@@ -25,12 +25,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
+import com.example.data.model.RobloxObject
+import com.example.data.model.RobloxClass
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.local.ProjectEntity
-import com.example.data.model.RobloxClass
 
 // Category-based Insert Object Dialog
 @Composable
@@ -49,7 +50,7 @@ fun InsertObjectDialog(
         "Layout" -> listOf(RobloxClass.UIListLayout, RobloxClass.UIGridLayout, RobloxClass.UIPadding)
         "Constraint" -> listOf(RobloxClass.UICorner, RobloxClass.UIStroke, RobloxClass.UIAspectRatioConstraint)
         "Script" -> listOf(RobloxClass.LocalScript, RobloxClass.ModuleScript)
-        "Effects" -> listOf(RobloxClass.UIGradient, RobloxClass.UIScale)
+        "Effects" -> listOf(RobloxClass.UIGradient, RobloxClass.UIScale, RobloxClass.UIShadow)
         else -> emptyList()
     }
 
@@ -357,6 +358,65 @@ fun ExportLuauDialog(
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0, 162, 255))
             ) {
                 Text("Copy & Close", color = Color.White)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ScriptEditorDialog(
+    obj: RobloxObject,
+    onDismiss: () -> Unit,
+    onSave: (String) -> Unit
+) {
+    var source by remember { mutableStateOf(obj.properties["Source"] as? String ?: "") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                RobloxClassIcon(className = obj.className, iconSize = 20.dp)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(text = "Editing: ${obj.name}", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            }
+        },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text("Script Source:", fontSize = 11.sp, color = Color.Gray)
+                Spacer(modifier = Modifier.height(4.dp))
+                OutlinedTextField(
+                    value = source,
+                    onValueChange = { source = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(300.dp),
+                    textStyle = MaterialTheme.typography.bodySmall.copy(
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp
+                    ),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color(0, 162, 255),
+                        unfocusedBorderColor = Color(60, 60, 65),
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedContainerColor = Color(15, 15, 18),
+                        unfocusedContainerColor = Color(15, 15, 18)
+                    )
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onSave(source); onDismiss() },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0, 162, 255))
+            ) {
+                Text("Save Script", color = Color.White)
             }
         },
         dismissButton = {

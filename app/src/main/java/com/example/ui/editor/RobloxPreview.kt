@@ -28,6 +28,11 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.TileMode
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlin.math.PI
 import kotlin.math.roundToInt
 import com.example.data.model.*
 
@@ -169,13 +174,57 @@ fun RenderRobloxObject(
 
     // Handle UICorner inside children
     val cornerChild = obj.children.firstOrNull { it.className == RobloxClass.UICorner }
-    val cornerRadius = if (cornerChild != null) {
+    val shape = if (cornerChild != null) {
         val r = cornerChild.properties["CornerRadius"] as? UDim2 ?: UDim2(0f, 8, 0f, 8)
-        r.offsetX.dp
+        val topLeft = cornerChild.properties["TopLeft"] as? UDim2 ?: r
+        val topRight = cornerChild.properties["TopRight"] as? UDim2 ?: r
+        val bottomLeft = cornerChild.properties["BottomLeft"] as? UDim2 ?: r
+        val bottomRight = cornerChild.properties["BottomRight"] as? UDim2 ?: r
+        
+        RoundedCornerShape(
+            topStart = topLeft.offsetX.dp,
+            topEnd = topRight.offsetX.dp,
+            bottomStart = bottomLeft.offsetX.dp,
+            bottomEnd = bottomRight.offsetX.dp
+        )
     } else {
-        0.dp
+        RoundedCornerShape(0.dp)
     }
-    val shape = RoundedCornerShape(cornerRadius)
+
+    // Handle UIGradient
+    val gradientChild = obj.children.firstOrNull { it.className == RobloxClass.UIGradient }
+    val backgroundModifier = if (gradientChild != null) {
+        val colorStr = gradientChild.properties["Color"] as? String ?: "255,255,255 to 150,150,150"
+        val rotation = (gradientChild.properties["Rotation"] as? Float ?: 0f) % 360f
+        
+        val colors = try {
+            colorStr.split(" to ").map { part ->
+                val rgb = part.split(",").map { it.trim().toInt() }
+                Color(rgb[0], rgb[1], rgb[2])
+            }
+        } catch (e: Exception) {
+            listOf(Color.White, Color.Gray)
+        }
+
+        // Calculate gradient start and end based on rotation
+        val angleRad = (rotation - 90f) * (PI.toFloat() / 180f)
+        val startX = 0.5f - 0.5f * cos(angleRad)
+        val startY = 0.5f - 0.5f * sin(angleRad)
+        val endX = 0.5f + 0.5f * cos(angleRad)
+        val endY = 0.5f + 0.5f * sin(angleRad)
+
+        Modifier.background(
+            Brush.linearGradient(
+                colors = colors,
+                start = Offset(startX * wPx, startY * hPx),
+                end = Offset(endX * wPx, endY * hPx),
+                tileMode = TileMode.Clamp
+            ),
+            shape = shape
+        )
+    } else {
+        Modifier.background(bgColor, shape)
+    }
 
     // Border/Stroke
     val strokeChild = obj.children.firstOrNull { it.className == RobloxClass.UIStroke }
@@ -192,12 +241,31 @@ fun RenderRobloxObject(
         }
     }
 
+    // Handle UIShadow rendering behind the Box
+    val shadowChild = obj.children.firstOrNull { it.className == RobloxClass.UIShadow }
+    if (shadowChild != null) {
+        val shadowEnabled = shadowChild.properties["Enabled"] as? Boolean ?: true
+        if (shadowEnabled) {
+            val shadowColorRaw = shadowChild.properties["Color"] as? Color3 ?: Color3(0, 0, 0)
+            val shadowTrans = shadowChild.properties["Transparency"] as? Float ?: 0.5f
+            val shadowOffset = shadowChild.properties["Offset"] as? Vector2 ?: Vector2(0f, 4f)
+            val shadowColor = Color(shadowColorRaw.r, shadowColorRaw.g, shadowColorRaw.b).copy(alpha = (1.0f - shadowTrans).coerceIn(0f, 1f))
+            
+            Box(
+                modifier = Modifier
+                    .offset((xPx + shadowOffset.x).dp, (yPx + shadowOffset.y).dp)
+                    .size(wPx.dp, hPx.dp)
+                    .background(shadowColor, shape)
+            )
+        }
+    }
+
     Box(
         modifier = Modifier
             .offset(xPx.dp, yPx.dp)
             .size(wPx.dp, hPx.dp)
             .clip(shape)
-            .background(bgColor, shape)
+            .then(backgroundModifier)
             .then(borderModifier)
             .combinedClickable(
                 enabled = !isPreviewMode,
@@ -507,7 +575,8 @@ fun RenderRobloxObject(
         val childrenToRender = obj.children.filter { 
             it.className != RobloxClass.UICorner && 
             it.className != RobloxClass.UIStroke &&
-            it.className != RobloxClass.UIAspectRatioConstraint
+            it.className != RobloxClass.UIAspectRatioConstraint &&
+            it.className != RobloxClass.UIShadow
         }
 
         // If it is a list or grid layout, we can stack them!

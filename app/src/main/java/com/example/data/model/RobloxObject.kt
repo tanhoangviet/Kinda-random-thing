@@ -21,7 +21,8 @@ enum class RobloxClass {
     UIScale,
     UIAspectRatioConstraint,
     LocalScript,
-    ModuleScript
+    ModuleScript,
+    UIShadow
 }
 
 data class UDim2(val scaleX: Float, val offsetX: Int, val scaleY: Float, val offsetY: Int) {
@@ -278,6 +279,18 @@ fun createDefaultObject(className: RobloxClass, customName: String? = null): Rob
         }
         RobloxClass.UICorner -> {
             properties["CornerRadius"] = UDim2(0f, 8, 0f, 8)
+            properties["TopLeft"] = UDim2(0f, 8, 0f, 8)
+            properties["TopRight"] = UDim2(0f, 8, 0f, 8)
+            properties["BottomLeft"] = UDim2(0f, 8, 0f, 8)
+            properties["BottomRight"] = UDim2(0f, 8, 0f, 8)
+        }
+        RobloxClass.UIShadow -> {
+            properties["Color"] = Color3(0, 0, 0)
+            properties["Transparency"] = 0.5f
+            properties["Blur"] = 8
+            properties["Spread"] = 0
+            properties["Offset"] = Vector2(0f, 4f)
+            properties["Enabled"] = true
         }
         RobloxClass.UIStroke -> {
             properties["Color"] = Color3(255, 255, 255)

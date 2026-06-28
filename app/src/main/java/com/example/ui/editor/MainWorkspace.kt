@@ -49,6 +49,7 @@ fun MainWorkspace(
     val screenWidth by viewModel.screenWidth.collectAsState()
     val screenHeight by viewModel.screenHeight.collectAsState()
     val savedProjects by viewModel.savedProjects.collectAsState()
+    val activeScriptId by viewModel.activeScriptId.collectAsState()
 
     val useSingleDragMode by viewModel.useSingleDragMode.collectAsState()
     val isTopbarVisible by viewModel.isTopbarVisible.collectAsState()
@@ -221,6 +222,7 @@ fun MainWorkspace(
                     onMove = { id, up -> viewModel.moveObjectInHierarchy(id, up) },
                     onCopy = { viewModel.copyObject(it) },
                     onPaste = { viewModel.pasteObject(it) },
+                    onOpenScript = { viewModel.openScriptEditor(it) },
                     onToggleDragMode = { viewModel.setUseSingleDragMode(!useSingleDragMode) }
                 )
             }
@@ -426,7 +428,8 @@ fun MainWorkspace(
                     onUpdateProperty = { id, name, value -> viewModel.updateProperty(id, name, value) },
                     onConvertOffsetToScale = { viewModel.convertOffsetToScale(it) },
                     onConvertScaleToOffset = { viewModel.convertScaleToOffset(it) },
-                    onApplyAnchorPreset = { id, pr -> viewModel.applyAnchorPreset(id, pr) }
+                    onApplyAnchorPreset = { id, pr -> viewModel.applyAnchorPreset(id, pr) },
+                    onOpenScript = { viewModel.openScriptEditor(it) }
                 )
             }
         }
@@ -630,6 +633,16 @@ fun MainWorkspace(
             titleContentColor = Color.White,
             textContentColor = Color.LightGray
         )
+    }
+
+    activeScriptId?.let { scriptId ->
+        viewModel.findObjectById(rootObj, scriptId)?.let { scriptObj ->
+            ScriptEditorDialog(
+                obj = scriptObj,
+                onDismiss = { viewModel.closeScriptEditor() },
+                onSave = { viewModel.updateProperty(scriptId, "Source", it) }
+            )
+        }
     }
 }
 

@@ -33,6 +33,7 @@ fun DexExplorerPanel(
     onMove: (String, Boolean) -> Unit, // (id, up)
     onCopy: (String) -> Unit,
     onPaste: (String) -> Unit,
+    onOpenScript: (String) -> Unit = {},
     onToggleDragMode: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -135,6 +136,7 @@ fun DexExplorerPanel(
                     onMove = onMove,
                     onCopy = onCopy,
                     onPaste = onPaste,
+                    onOpenScript = onOpenScript,
                     expandedNodes = expandedNodes,
                     searchQuery = searchQuery,
                     classFilter = classFilter,
@@ -189,6 +191,7 @@ fun RenderExplorerNode(
     onMove: (String, Boolean) -> Unit,
     onCopy: (String) -> Unit,
     onPaste: (String) -> Unit,
+    onOpenScript: (String) -> Unit,
     expandedNodes: MutableMap<String, Boolean>,
     searchQuery: String,
     classFilter: RobloxClass?,
@@ -215,8 +218,12 @@ fun RenderExplorerNode(
                     .combinedClickable(
                         onClick = { onSelect(node.id) },
                         onDoubleClick = {
-                            onSelect(node.id)
-                            onToggleDragMode()
+                            if (node.className == RobloxClass.LocalScript || node.className == RobloxClass.ModuleScript) {
+                                onOpenScript(node.id)
+                            } else {
+                                onSelect(node.id)
+                                onToggleDragMode()
+                            }
                         },
                         onLongClick = { showContextMenu = true }
                     )
@@ -274,6 +281,14 @@ fun RenderExplorerNode(
                 expanded = showContextMenu,
                 onDismissRequest = { showContextMenu = false }
             ) {
+                if (node.className == RobloxClass.LocalScript || node.className == RobloxClass.ModuleScript) {
+                    DropdownMenuItem(
+                        leadingIcon = { Icon(Icons.Default.Code, contentDescription = null, modifier = Modifier.size(14.dp)) },
+                        text = { Text("Open Script", fontSize = 11.sp) },
+                        onClick = { onOpenScript(node.id); showContextMenu = false }
+                    )
+                    Divider()
+                }
                 DropdownMenuItem(
                     leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(14.dp)) },
                     text = { Text("Rename", fontSize = 11.sp) },
@@ -328,6 +343,7 @@ fun RenderExplorerNode(
                     onMove = onMove,
                     onCopy = onCopy,
                     onPaste = onPaste,
+                    onOpenScript = onOpenScript,
                     expandedNodes = expandedNodes,
                     searchQuery = searchQuery,
                     classFilter = classFilter,
@@ -358,5 +374,6 @@ fun getClassEmojiIcon(className: RobloxClass): String {
         RobloxClass.UIAspectRatioConstraint -> "📐"
         RobloxClass.LocalScript -> "🔵"
         RobloxClass.ModuleScript -> "🟡"
+        RobloxClass.UIShadow -> "🌑"
     }
 }

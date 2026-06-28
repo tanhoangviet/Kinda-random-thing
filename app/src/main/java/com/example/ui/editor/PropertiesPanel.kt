@@ -30,6 +30,7 @@ fun PropertiesPanel(
     onConvertOffsetToScale: (String) -> Unit,
     onConvertScaleToOffset: (String) -> Unit,
     onApplyAnchorPreset: (String, String) -> Unit,
+    onOpenScript: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     if (selectedObj == null) {
@@ -152,6 +153,20 @@ fun PropertiesPanel(
                     min = 1,
                     max = 100
                 )
+            }
+
+            if (selectedObj.className == RobloxClass.LocalScript || selectedObj.className == RobloxClass.ModuleScript) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = { onOpenScript(selectedObj.id) },
+                    modifier = Modifier.fillMaxWidth().height(32.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0, 162, 255)),
+                    contentPadding = PaddingValues(0.dp)
+                ) {
+                    Icon(Icons.Default.Code, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Edit Script Source", fontSize = 10.sp)
+                }
             }
         }
 
@@ -292,6 +307,40 @@ fun PropertiesPanel(
                     )
                 }
             }
+
+            if (selectedObj.properties.containsKey("Color") && selectedObj.properties["Color"] is Color3) {
+                val col = selectedObj.properties["Color"] as? Color3 ?: Color3(255, 255, 255)
+                PropertyRow(label = "Color") {
+                    Box(
+                        modifier = Modifier
+                            .size(34.dp, 22.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(Color(col.r, col.g, col.b))
+                            .border(1.dp, Color.Gray, RoundedCornerShape(4.dp))
+                            .clickable { activeColorProp = Pair("Color", col) }
+                    )
+                }
+            }
+
+            if (selectedObj.properties.containsKey("Transparency") && selectedObj.properties["Transparency"] is Float) {
+                val trans = selectedObj.properties["Transparency"] as? Float ?: 0f
+                PropertyRow(label = "Transparency") {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Slider(
+                            value = trans,
+                            onValueChange = { onUpdateProperty(selectedObj.id, "Transparency", it) },
+                            valueRange = 0f..1f,
+                            modifier = Modifier.width(100.dp).height(12.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = String.format("%.2f", trans),
+                            color = Color.White,
+                            fontSize = 9.sp
+                        )
+                    }
+                }
+            }
         }
 
         // Text Properties (only for Text elements)
@@ -400,7 +449,7 @@ fun PropertiesPanel(
         }
 
         // Layout Constraints (UIListLayout, UIGridLayout, etc.)
-        val isLayoutClass = selectedObj.className in listOf(RobloxClass.UIListLayout, RobloxClass.UIGridLayout, RobloxClass.UIPadding, RobloxClass.UICorner, RobloxClass.UIStroke)
+        val isLayoutClass = selectedObj.className in listOf(RobloxClass.UIListLayout, RobloxClass.UIGridLayout, RobloxClass.UIPadding, RobloxClass.UICorner, RobloxClass.UIStroke, RobloxClass.UIShadow)
         if (isLayoutClass) {
             PropertySection(title = "Layout Configurations") {
                 if (selectedObj.properties.containsKey("FillDirection")) {
@@ -439,6 +488,54 @@ fun PropertiesPanel(
                     }
                 }
 
+                if (selectedObj.properties.containsKey("TopLeft")) {
+                    val radius = selectedObj.properties["TopLeft"] as? UDim2 ?: UDim2(0f, 8, 0f, 8)
+                    PropertyRow(label = "Top Left Corner") {
+                        StepperInput(
+                            value = radius.offsetX,
+                            onValueChange = { onUpdateProperty(selectedObj.id, "TopLeft", radius.copy(offsetX = it)) },
+                            min = 0,
+                            max = 100
+                        )
+                    }
+                }
+
+                if (selectedObj.properties.containsKey("TopRight")) {
+                    val radius = selectedObj.properties["TopRight"] as? UDim2 ?: UDim2(0f, 8, 0f, 8)
+                    PropertyRow(label = "Top Right Corner") {
+                        StepperInput(
+                            value = radius.offsetX,
+                            onValueChange = { onUpdateProperty(selectedObj.id, "TopRight", radius.copy(offsetX = it)) },
+                            min = 0,
+                            max = 100
+                        )
+                    }
+                }
+
+                if (selectedObj.properties.containsKey("BottomLeft")) {
+                    val radius = selectedObj.properties["BottomLeft"] as? UDim2 ?: UDim2(0f, 8, 0f, 8)
+                    PropertyRow(label = "Bottom Left Corner") {
+                        StepperInput(
+                            value = radius.offsetX,
+                            onValueChange = { onUpdateProperty(selectedObj.id, "BottomLeft", radius.copy(offsetX = it)) },
+                            min = 0,
+                            max = 100
+                        )
+                    }
+                }
+
+                if (selectedObj.properties.containsKey("BottomRight")) {
+                    val radius = selectedObj.properties["BottomRight"] as? UDim2 ?: UDim2(0f, 8, 0f, 8)
+                    PropertyRow(label = "Bottom Right Corner") {
+                        StepperInput(
+                            value = radius.offsetX,
+                            onValueChange = { onUpdateProperty(selectedObj.id, "BottomRight", radius.copy(offsetX = it)) },
+                            min = 0,
+                            max = 100
+                        )
+                    }
+                }
+
                 if (selectedObj.properties.containsKey("Thickness")) {
                     val strokeThick = selectedObj.properties["Thickness"] as? Int ?: 1
                     PropertyRow(label = "Thickness") {
@@ -446,6 +543,44 @@ fun PropertiesPanel(
                             onUpdateProperty(selectedObj.id, "Thickness", it)
                         }, min = 1, max = 20)
                     }
+                }
+
+                if (selectedObj.properties.containsKey("Blur")) {
+                    val blurVal = selectedObj.properties["Blur"] as? Int ?: 8
+                    PropertyRow(label = "Blur") {
+                        StepperInput(value = blurVal, onValueChange = {
+                            onUpdateProperty(selectedObj.id, "Blur", it)
+                        }, min = 0, max = 100)
+                    }
+                }
+
+                if (selectedObj.properties.containsKey("Spread")) {
+                    val spreadVal = selectedObj.properties["Spread"] as? Int ?: 0
+                    PropertyRow(label = "Spread") {
+                        StepperInput(value = spreadVal, onValueChange = {
+                            onUpdateProperty(selectedObj.id, "Spread", it)
+                        }, min = -100, max = 100)
+                    }
+                }
+
+                if (selectedObj.properties.containsKey("Enabled")) {
+                    val enabled = selectedObj.properties["Enabled"] as? Boolean ?: true
+                    PropertyRow(label = "Enabled") {
+                        Switch(
+                            checked = enabled,
+                            onCheckedChange = { onUpdateProperty(selectedObj.id, "Enabled", it) },
+                            modifier = Modifier.scale(0.7f)
+                        )
+                    }
+                }
+
+                if (selectedObj.properties.containsKey("Offset")) {
+                    val offset = selectedObj.properties["Offset"] as? Vector2 ?: Vector2(0f, 4f)
+                    Vector2Editor(
+                        label = "Offset",
+                        vector2 = offset,
+                        onValueChange = { onUpdateProperty(selectedObj.id, "Offset", it) }
+                    )
                 }
             }
         }

@@ -95,11 +95,12 @@ object LuauGenerator {
         // Safe list to exclude properties that aren't valid for that class
         val layoutOnlyProps = listOf("FillDirection", "HorizontalAlignment", "VerticalAlignment", "Padding", "SortOrder", "CellPadding", "CellSize")
         val paddingOnlyProps = listOf("PaddingTop", "PaddingBottom", "PaddingLeft", "PaddingRight")
-        val cornerOnlyProps = listOf("CornerRadius")
+        val cornerOnlyProps = listOf("CornerRadius", "TopLeft", "TopRight", "BottomLeft", "BottomRight")
         val strokeOnlyProps = listOf("Color", "Thickness", "Transparency", "ApplyStrokeMode")
         val textOnlyProps = listOf("Text", "TextColor3", "TextSize", "TextTransparency", "TextWrapped", "TextScaled", "Font", "TextXAlignment", "TextYAlignment", "RichText")
         val imageOnlyProps = listOf("Image", "ImageTransparency", "ScaleType")
         val frameOnlyProps = listOf("BackgroundColor3", "BackgroundTransparency", "BorderSizePixel")
+        val shadowOnlyProps = listOf("Color", "Transparency", "Blur", "Spread", "Offset", "Enabled")
         
         if (propName == "Visible" || propName == "Active" || propName == "ZIndex" || propName == "LayoutOrder") return true
         if (propName == "Size" || propName == "Position" || propName == "AnchorPoint") {
@@ -128,6 +129,7 @@ object LuauGenerator {
             RobloxClass.UIScale -> return propName == "Scale"
             RobloxClass.UIAspectRatioConstraint -> return propName in listOf("AspectRatio", "AspectType", "DominantAxis")
             RobloxClass.LocalScript, RobloxClass.ModuleScript -> return propName == "Source"
+            RobloxClass.UIShadow -> return propName in shadowOnlyProps
         }
     }
     

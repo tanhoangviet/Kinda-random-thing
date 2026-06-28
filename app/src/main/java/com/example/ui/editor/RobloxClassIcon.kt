@@ -403,6 +403,25 @@ fun RobloxClassIcon(
                     )
                 }
             }
+            RobloxClass.UIShadow -> {
+                // Drop shadow icon (a grey shadow square under a blue outline square)
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val stroke = Stroke(width = 1.dp.toPx())
+                    // Draw shadow
+                    drawRect(
+                        Color(0, 0, 0, 80),
+                        topLeft = Offset(3.dp.toPx(), 3.dp.toPx()),
+                        size = Size(size.width - 4.dp.toPx(), size.height - 4.dp.toPx())
+                    )
+                    // Draw foreground box
+                    drawRect(
+                        Color(0, 162, 255),
+                        topLeft = Offset(0f, 0f),
+                        size = Size(size.width - 4.dp.toPx(), size.height - 4.dp.toPx()),
+                        style = stroke
+                    )
+                }
+            }
         }
     }
 }

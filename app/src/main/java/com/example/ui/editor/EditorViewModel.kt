@@ -52,6 +52,17 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     private val _selectedObjectId = MutableStateFlow<String?>(null)
     val selectedObjectId: StateFlow<String?> = _selectedObjectId.asStateFlow()
 
+    private val _activeScriptId = MutableStateFlow<String?>(null)
+    val activeScriptId: StateFlow<String?> = _activeScriptId.asStateFlow()
+
+    fun openScriptEditor(id: String) {
+        _activeScriptId.value = id
+    }
+
+    fun closeScriptEditor() {
+        _activeScriptId.value = null
+    }
+
     private val _isPreviewMode = MutableStateFlow(false)
     val isPreviewMode: StateFlow<Boolean> = _isPreviewMode.asStateFlow()
 
@@ -451,8 +462,8 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     // --- Private Helper Functions ---
-
-    private fun findObjectById(root: RobloxObject, id: String): RobloxObject? {
+    // Change to public to allow use in MainWorkspace for ScriptEditor
+    fun findObjectById(root: RobloxObject, id: String): RobloxObject? {
         if (root.id == id) return root
         for (child in root.children) {
             val found = findObjectById(child, id)
