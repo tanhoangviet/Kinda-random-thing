@@ -1,0 +1,6 @@
+{
+  "name": "Roblox UI Designer Mobile",
+  "description": "A highly optimized mobile landscape editor to design, customize, arrange, and export Roblox UI components directly to Roblox Luau code.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
