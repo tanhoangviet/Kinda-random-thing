@@ -1,9 +1,12 @@
+@file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 package com.example.ui.editor
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -39,7 +42,9 @@ fun RobloxCanvasPreview(
     scaleFactor: Float,
     showGrid: Boolean,
     gridSize: Int,
-    isPreviewMode: Boolean
+    isPreviewMode: Boolean,
+    useSingleDragMode: Boolean = false,
+    onToggleDragMode: () -> Unit = {}
 ) {
     Box(
         modifier = Modifier
@@ -63,7 +68,9 @@ fun RobloxCanvasPreview(
                 onMoveOrResize = onMoveOrResize,
                 isPreviewMode = isPreviewMode,
                 gridSize = gridSize,
-                scaleFactor = scaleFactor
+                scaleFactor = scaleFactor,
+                useSingleDragMode = useSingleDragMode,
+                onToggleDragMode = onToggleDragMode
             )
         }
 
@@ -122,7 +129,9 @@ fun RenderRobloxObject(
     onMoveOrResize: (String, UDim2, UDim2) -> Unit,
     isPreviewMode: Boolean,
     gridSize: Int,
-    scaleFactor: Float
+    scaleFactor: Float,
+    useSingleDragMode: Boolean = false,
+    onToggleDragMode: () -> Unit = {}
 ) {
     // Check basic structural values
     val isVisible = obj.properties["Visible"] as? Boolean ?: true
@@ -182,23 +191,44 @@ fun RenderRobloxObject(
             .clip(shape)
             .background(bgColor, shape)
             .then(borderModifier)
-            .clickable(enabled = !isPreviewMode) {
-                onSelect(obj.id)
-            }
-            .pointerInput(obj.id, isPreviewMode) {
+            .combinedClickable(
+                enabled = !isPreviewMode,
+                onClick = { onSelect(obj.id) },
+                onDoubleClick = {
+                    onSelect(obj.id)
+                    onToggleDragMode()
+                }
+            )
+            .pointerInput(obj.id, isPreviewMode, useSingleDragMode) {
                 if (!isPreviewMode) {
                     var dragStartX = pos.offsetX.toFloat()
                     var dragStartY = pos.offsetY.toFloat()
-                    detectDragGestures(
-                        onDragStart = {
-                            onSelect(obj.id)
-                            dragStartX = pos.offsetX.toFloat()
-                            dragStartY = pos.offsetY.toFloat()
-                        },
-                        onDrag = { change, dragAmount ->
-                            change.consume()
-                            val dxDp = dragAmount.x / (density * scaleFactor)
-                            val dyDp = dragAmount.y / (density * scaleFactor)
+                    detectTransformGestures { _, pan, zoom, _ ->
+                        if (!useSingleDragMode && zoom != 1.0f) {
+                            // 2-finger pinch resize
+                            val newOffsetX = (size.offsetX * zoom).roundToInt()
+                            val newOffsetY = (size.offsetY * zoom).roundToInt()
+                            val newScaleX = (size.scaleX * zoom).coerceIn(0f, 10f)
+                            val newScaleY = (size.scaleY * zoom).coerceIn(0f, 10f)
+                            
+                            val updatedSize = size.copy(
+                                scaleX = if (size.scaleX > 0f) newScaleX else 0f,
+                                offsetX = if (size.scaleX == 0f) newOffsetX.coerceAtLeast(10) else size.offsetX,
+                                scaleY = if (size.scaleY > 0f) newScaleY else 0f,
+                                offsetY = if (size.scaleY == 0f) newOffsetY.coerceAtLeast(10) else size.offsetY
+                            )
+                            onMoveOrResize(obj.id, pos, updatedSize)
+                        } else if (pan != Offset.Zero) {
+                            // 1-finger hold and drag to move
+                            val dxDp = pan.x / (density * scaleFactor)
+                            val dyDp = pan.y / (density * scaleFactor)
+                            
+                            val currentX = pos.offsetX.toFloat()
+                            val currentY = pos.offsetY.toFloat()
+                            if (kotlin.math.abs(dragStartX - currentX) > 50f || kotlin.math.abs(dragStartY - currentY) > 50f) {
+                                dragStartX = currentX
+                                dragStartY = currentY
+                            }
                             
                             dragStartX += dxDp
                             dragStartY += dyDp
@@ -219,7 +249,7 @@ fun RenderRobloxObject(
                                 )
                             }
                         }
-                    )
+                    }
                 }
             }
     ) {
@@ -479,7 +509,9 @@ fun RenderRobloxObject(
                     onMoveOrResize = onMoveOrResize,
                     isPreviewMode = isPreviewMode,
                     gridSize = gridSize,
-                    scaleFactor = scaleFactor
+                    scaleFactor = scaleFactor,
+                    useSingleDragMode = useSingleDragMode,
+                    onToggleDragMode = onToggleDragMode
                 )
             }
         }
@@ -491,52 +523,272 @@ fun RenderRobloxObject(
                     .fillMaxSize()
                     .border(1.5.dp, Color(0, 162, 255)) // Highlight Blue selection
             ) {
-                // Resize Handle dots at bottom-right corner
-                Box(
-                    modifier = Modifier
-                        .size(12.dp)
-                        .background(Color(0, 162, 255), RoundedCornerShape(2.dp))
-                        .align(Alignment.BottomEnd)
-                        .pointerInput(obj.id) {
-                            var resizeStartW = size.offsetX.toFloat()
-                            var resizeStartH = size.offsetY.toFloat()
-                            detectDragGestures(
-                                onDragStart = {
-                                    resizeStartW = size.offsetX.toFloat()
-                                    resizeStartH = size.offsetY.toFloat()
-                                },
-                                onDrag = { change, dragAmount ->
-                                    change.consume()
-                                    val dxDp = dragAmount.x / (density * scaleFactor)
-                                    val dyDp = dragAmount.y / (density * scaleFactor)
-                                    
-                                    resizeStartW += dxDp
-                                    resizeStartH += dyDp
-                                    
-                                    val finalW = if (gridSize > 1) {
-                                        (resizeStartW.roundToInt() / gridSize) * gridSize
-                                    } else resizeStartW.roundToInt()
-                                    
-                                    val finalH = if (gridSize > 1) {
-                                        (resizeStartH.roundToInt() / gridSize) * gridSize
-                                    } else resizeStartH.roundToInt()
-                                    
-                                    val minOffsetX = (10 - (size.scaleX * parentW)).toInt()
-                                    val minOffsetY = (10 - (size.scaleY * parentH)).toInt()
-                                    val safeW = finalW.coerceAtLeast(minOffsetX)
-                                    val safeH = finalH.coerceAtLeast(minOffsetY)
-                                    
-                                    if (safeW != size.offsetX || safeH != size.offsetY) {
+                if (useSingleDragMode) {
+                    // TL Handle
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .align(Alignment.TopStart)
+                            .pointerInput(obj.id) {
+                                var resizeStartX = pos.offsetX.toFloat()
+                                var resizeStartY = pos.offsetY.toFloat()
+                                var resizeStartW = size.offsetX.toFloat()
+                                var resizeStartH = size.offsetY.toFloat()
+                                detectDragGestures(
+                                    onDragStart = {
+                                        resizeStartX = pos.offsetX.toFloat()
+                                        resizeStartY = pos.offsetY.toFloat()
+                                        resizeStartW = size.offsetX.toFloat()
+                                        resizeStartH = size.offsetY.toFloat()
+                                    },
+                                    onDrag = { change, dragAmount ->
+                                        change.consume()
+                                        val dxDp = dragAmount.x / (density * scaleFactor)
+                                        val dyDp = dragAmount.y / (density * scaleFactor)
+                                        
+                                        resizeStartX += dxDp
+                                        resizeStartY += dyDp
+                                        resizeStartW -= dxDp
+                                        resizeStartH -= dyDp
+                                        
+                                        val finalW = if (gridSize > 1) (resizeStartW.roundToInt() / gridSize) * gridSize else resizeStartW.roundToInt()
+                                        val finalH = if (gridSize > 1) (resizeStartH.roundToInt() / gridSize) * gridSize else resizeStartH.roundToInt()
+                                        
+                                        val minOffsetX = (10 - (size.scaleX * parentW)).toInt()
+                                        val minOffsetY = (10 - (size.scaleY * parentH)).toInt()
+                                        val safeW = finalW.coerceAtLeast(minOffsetX)
+                                        val safeH = finalH.coerceAtLeast(minOffsetY)
+                                        
+                                        val diffX = size.offsetX - safeW
+                                        val adjustedX = pos.offsetX + diffX
+                                        val diffY = size.offsetY - safeH
+                                        val adjustedY = pos.offsetY + diffY
+                                        
                                         onMoveOrResize(
                                             obj.id,
-                                            pos,
+                                            pos.copy(offsetX = adjustedX, offsetY = adjustedY),
                                             size.copy(offsetX = safeW, offsetY = safeH)
                                         )
                                     }
-                                }
-                            )
-                        }
-                )
+                                )
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(10.dp)
+                                .background(Color(0, 162, 255), RoundedCornerShape(2.dp))
+                                .border(1.dp, Color.White, RoundedCornerShape(2.dp))
+                        )
+                    }
+
+                    // TR Handle
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .align(Alignment.TopEnd)
+                            .pointerInput(obj.id) {
+                                var resizeStartY = pos.offsetY.toFloat()
+                                var resizeStartW = size.offsetX.toFloat()
+                                var resizeStartH = size.offsetY.toFloat()
+                                detectDragGestures(
+                                    onDragStart = {
+                                        resizeStartY = pos.offsetY.toFloat()
+                                        resizeStartW = size.offsetX.toFloat()
+                                        resizeStartH = size.offsetY.toFloat()
+                                    },
+                                    onDrag = { change, dragAmount ->
+                                        change.consume()
+                                        val dxDp = dragAmount.x / (density * scaleFactor)
+                                        val dyDp = dragAmount.y / (density * scaleFactor)
+                                        
+                                        resizeStartY += dyDp
+                                        resizeStartW += dxDp
+                                        resizeStartH -= dyDp
+                                        
+                                        val finalW = if (gridSize > 1) (resizeStartW.roundToInt() / gridSize) * gridSize else resizeStartW.roundToInt()
+                                        val finalH = if (gridSize > 1) (resizeStartH.roundToInt() / gridSize) * gridSize else resizeStartH.roundToInt()
+                                        
+                                        val minOffsetX = (10 - (size.scaleX * parentW)).toInt()
+                                        val minOffsetY = (10 - (size.scaleY * parentH)).toInt()
+                                        val safeW = finalW.coerceAtLeast(minOffsetX)
+                                        val safeH = finalH.coerceAtLeast(minOffsetY)
+                                        
+                                        val diffY = size.offsetY - safeH
+                                        val adjustedY = pos.offsetY + diffY
+                                        
+                                        onMoveOrResize(
+                                            obj.id,
+                                            pos.copy(offsetY = adjustedY),
+                                            size.copy(offsetX = safeW, offsetY = safeH)
+                                        )
+                                    }
+                                )
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(10.dp)
+                                .background(Color(0, 162, 255), RoundedCornerShape(2.dp))
+                                .border(1.dp, Color.White, RoundedCornerShape(2.dp))
+                        )
+                    }
+
+                    // BL Handle
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .align(Alignment.BottomStart)
+                            .pointerInput(obj.id) {
+                                var resizeStartX = pos.offsetX.toFloat()
+                                var resizeStartW = size.offsetX.toFloat()
+                                var resizeStartH = size.offsetY.toFloat()
+                                detectDragGestures(
+                                    onDragStart = {
+                                        resizeStartX = pos.offsetX.toFloat()
+                                        resizeStartW = size.offsetX.toFloat()
+                                        resizeStartH = size.offsetY.toFloat()
+                                    },
+                                    onDrag = { change, dragAmount ->
+                                        change.consume()
+                                        val dxDp = dragAmount.x / (density * scaleFactor)
+                                        val dyDp = dragAmount.y / (density * scaleFactor)
+                                        
+                                        resizeStartX += dxDp
+                                        resizeStartW -= dxDp
+                                        resizeStartH += dyDp
+                                        
+                                        val finalW = if (gridSize > 1) (resizeStartW.roundToInt() / gridSize) * gridSize else resizeStartW.roundToInt()
+                                        val finalH = if (gridSize > 1) (resizeStartH.roundToInt() / gridSize) * gridSize else resizeStartH.roundToInt()
+                                        
+                                        val minOffsetX = (10 - (size.scaleX * parentW)).toInt()
+                                        val minOffsetY = (10 - (size.scaleY * parentH)).toInt()
+                                        val safeW = finalW.coerceAtLeast(minOffsetX)
+                                        val safeH = finalH.coerceAtLeast(minOffsetY)
+                                        
+                                        val diffX = size.offsetX - safeW
+                                        val adjustedX = pos.offsetX + diffX
+                                        
+                                        onMoveOrResize(
+                                            obj.id,
+                                            pos.copy(offsetX = adjustedX),
+                                            size.copy(offsetX = safeW, offsetY = safeH)
+                                        )
+                                    }
+                                )
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(10.dp)
+                                .background(Color(0, 162, 255), RoundedCornerShape(2.dp))
+                                .border(1.dp, Color.White, RoundedCornerShape(2.dp))
+                        )
+                    }
+
+                    // BR Handle
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .align(Alignment.BottomEnd)
+                            .pointerInput(obj.id) {
+                                var resizeStartW = size.offsetX.toFloat()
+                                var resizeStartH = size.offsetY.toFloat()
+                                detectDragGestures(
+                                    onDragStart = {
+                                        resizeStartW = size.offsetX.toFloat()
+                                        resizeStartH = size.offsetY.toFloat()
+                                    },
+                                    onDrag = { change, dragAmount ->
+                                        change.consume()
+                                        val dxDp = dragAmount.x / (density * scaleFactor)
+                                        val dyDp = dragAmount.y / (density * scaleFactor)
+                                        
+                                        resizeStartW += dxDp
+                                        resizeStartH += dyDp
+                                        
+                                        val finalW = if (gridSize > 1) {
+                                            (resizeStartW.roundToInt() / gridSize) * gridSize
+                                        } else resizeStartW.roundToInt()
+                                        
+                                        val finalH = if (gridSize > 1) {
+                                            (resizeStartH.roundToInt() / gridSize) * gridSize
+                                        } else resizeStartH.roundToInt()
+                                        
+                                        val minOffsetX = (10 - (size.scaleX * parentW)).toInt()
+                                        val minOffsetY = (10 - (size.scaleY * parentH)).toInt()
+                                        val safeW = finalW.coerceAtLeast(minOffsetX)
+                                        val safeH = finalH.coerceAtLeast(minOffsetY)
+                                        
+                                        if (safeW != size.offsetX || safeH != size.offsetY) {
+                                            onMoveOrResize(
+                                                obj.id,
+                                                pos,
+                                                size.copy(offsetX = safeW, offsetY = safeH)
+                                            )
+                                        }
+                                    }
+                                )
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(10.dp)
+                                .background(Color(0, 162, 255), RoundedCornerShape(2.dp))
+                                .border(1.dp, Color.White, RoundedCornerShape(2.dp))
+                        )
+                    }
+                } else {
+                    // Resize Handle dots at bottom-right corner
+                    Box(
+                        modifier = Modifier
+                            .size(12.dp)
+                            .background(Color(0, 162, 255), RoundedCornerShape(2.dp))
+                            .align(Alignment.BottomEnd)
+                            .pointerInput(obj.id) {
+                                var resizeStartW = size.offsetX.toFloat()
+                                var resizeStartH = size.offsetY.toFloat()
+                                detectDragGestures(
+                                    onDragStart = {
+                                        resizeStartW = size.offsetX.toFloat()
+                                        resizeStartH = size.offsetY.toFloat()
+                                    },
+                                    onDrag = { change, dragAmount ->
+                                        change.consume()
+                                        val dxDp = dragAmount.x / (density * scaleFactor)
+                                        val dyDp = dragAmount.y / (density * scaleFactor)
+                                        
+                                        resizeStartW += dxDp
+                                        resizeStartH += dyDp
+                                        
+                                        val finalW = if (gridSize > 1) {
+                                            (resizeStartW.roundToInt() / gridSize) * gridSize
+                                        } else resizeStartW.roundToInt()
+                                        
+                                        val finalH = if (gridSize > 1) {
+                                            (resizeStartH.roundToInt() / gridSize) * gridSize
+                                        } else resizeStartH.roundToInt()
+                                        
+                                        val minOffsetX = (10 - (size.scaleX * parentW)).toInt()
+                                        val minOffsetY = (10 - (size.scaleY * parentH)).toInt()
+                                        val safeW = finalW.coerceAtLeast(minOffsetX)
+                                        val safeH = finalH.coerceAtLeast(minOffsetY)
+                                        
+                                        if (safeW != size.offsetX || safeH != size.offsetY) {
+                                            onMoveOrResize(
+                                                obj.id,
+                                                pos,
+                                                size.copy(offsetX = safeW, offsetY = safeH)
+                                            )
+                                        }
+                                    }
+                                )
+                            }
+                    )
+                }
                 // Top-Left Name label overlay
                 Box(
                     modifier = Modifier

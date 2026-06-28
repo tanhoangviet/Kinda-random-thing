@@ -33,6 +33,7 @@ fun DexExplorerPanel(
     onMove: (String, Boolean) -> Unit, // (id, up)
     onCopy: (String) -> Unit,
     onPaste: (String) -> Unit,
+    onToggleDragMode: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var searchQuery by remember { mutableStateOf("") }
@@ -136,7 +137,8 @@ fun DexExplorerPanel(
                     onPaste = onPaste,
                     expandedNodes = expandedNodes,
                     searchQuery = searchQuery,
-                    classFilter = classFilter
+                    classFilter = classFilter,
+                    onToggleDragMode = onToggleDragMode
                 )
             }
         }
@@ -189,7 +191,8 @@ fun RenderExplorerNode(
     onPaste: (String) -> Unit,
     expandedNodes: MutableMap<String, Boolean>,
     searchQuery: String,
-    classFilter: RobloxClass?
+    classFilter: RobloxClass?,
+    onToggleDragMode: () -> Unit
 ) {
     val isSelected = node.id == selectedId
     val isExpanded = expandedNodes[node.id] ?: false
@@ -211,6 +214,10 @@ fun RenderExplorerNode(
                     .background(if (isSelected) Color(0, 162, 255, 60) else Color.Transparent)
                     .combinedClickable(
                         onClick = { onSelect(node.id) },
+                        onDoubleClick = {
+                            onSelect(node.id)
+                            onToggleDragMode()
+                        },
                         onLongClick = { showContextMenu = true }
                     )
                     .padding(start = (depth * 10).dp, end = 4.dp),
@@ -323,7 +330,8 @@ fun RenderExplorerNode(
                     onPaste = onPaste,
                     expandedNodes = expandedNodes,
                     searchQuery = searchQuery,
-                    classFilter = classFilter
+                    classFilter = classFilter,
+                    onToggleDragMode = onToggleDragMode
                 )
             }
         }

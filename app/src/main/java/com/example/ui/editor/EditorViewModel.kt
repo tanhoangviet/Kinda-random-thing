@@ -191,6 +191,28 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         _selectedObjectId.value = id
     }
 
+    // --- Custom User Settings ---
+    private val _useSingleDragMode = MutableStateFlow(false)
+    val useSingleDragMode: StateFlow<Boolean> = _useSingleDragMode.asStateFlow()
+
+    private val _isTopbarVisible = MutableStateFlow(true)
+    val isTopbarVisible: StateFlow<Boolean> = _isTopbarVisible.asStateFlow()
+
+    private val _showSettingsDialog = MutableStateFlow(false)
+    val showSettingsDialog: StateFlow<Boolean> = _showSettingsDialog.asStateFlow()
+
+    fun setUseSingleDragMode(enabled: Boolean) {
+        _useSingleDragMode.value = enabled
+    }
+
+    fun setTopbarVisible(visible: Boolean) {
+        _isTopbarVisible.value = visible
+    }
+
+    fun setShowSettingsDialog(show: Boolean) {
+        _showSettingsDialog.value = show
+    }
+
     fun togglePreviewMode() {
         _isPreviewMode.value = !_isPreviewMode.value
     }
