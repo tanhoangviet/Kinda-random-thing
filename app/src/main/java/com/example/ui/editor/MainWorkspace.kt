@@ -192,7 +192,7 @@ fun MainWorkspace(
                         containerColor = Color(20, 20, 22),
                         titleContentColor = Color.White
                     ),
-                    modifier = Modifier.height(48.dp)
+                    modifier = Modifier.statusBarsPadding()
                 )
             }
         },
@@ -202,6 +202,7 @@ fun MainWorkspace(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .then(if (!isTopbarVisible) Modifier.statusBarsPadding() else Modifier)
         ) {
             // Left Panel (Dex Explorer hierarchy)
             AnimatedVisibility(

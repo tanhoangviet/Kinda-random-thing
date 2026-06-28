@@ -142,6 +142,14 @@ fun RenderRobloxObject(
     // Position and size extraction (UDim2)
     val pos = obj.properties["Position"] as? UDim2 ?: UDim2(0f, 0, 0f, 0)
     val size = obj.properties["Size"] as? UDim2 ?: UDim2(0.2f, 0, 0.2f, 0)
+    
+    // Remember updated states to avoid capturing stale values in pointerInput
+    val currentPos by rememberUpdatedState(pos)
+    val currentSize by rememberUpdatedState(size)
+    val currentGridSize by rememberUpdatedState(gridSize)
+    val currentScaleFactor by rememberUpdatedState(scaleFactor)
+    val currentParentW by rememberUpdatedState(parentW)
+    val currentParentH by rememberUpdatedState(parentH)
     val anchor = obj.properties["AnchorPoint"] as? Vector2 ?: Vector2(0f, 0f)
 
     // Compute absolute pixel bounds
@@ -201,52 +209,92 @@ fun RenderRobloxObject(
             )
             .pointerInput(obj.id, isPreviewMode, useSingleDragMode) {
                 if (!isPreviewMode) {
-                    var dragStartX = pos.offsetX.toFloat()
-                    var dragStartY = pos.offsetY.toFloat()
-                    detectTransformGestures { _, pan, zoom, _ ->
-                        if (!useSingleDragMode && zoom != 1.0f) {
-                            // 2-finger pinch resize
-                            val newOffsetX = (size.offsetX * zoom).roundToInt()
-                            val newOffsetY = (size.offsetY * zoom).roundToInt()
-                            val newScaleX = (size.scaleX * zoom).coerceIn(0f, 10f)
-                            val newScaleY = (size.scaleY * zoom).coerceIn(0f, 10f)
-                            
-                            val updatedSize = size.copy(
-                                scaleX = if (size.scaleX > 0f) newScaleX else 0f,
-                                offsetX = if (size.scaleX == 0f) newOffsetX.coerceAtLeast(10) else size.offsetX,
-                                scaleY = if (size.scaleY > 0f) newScaleY else 0f,
-                                offsetY = if (size.scaleY == 0f) newOffsetY.coerceAtLeast(10) else size.offsetY
-                            )
-                            onMoveOrResize(obj.id, pos, updatedSize)
-                        } else if (pan != Offset.Zero) {
-                            // 1-finger hold and drag to move
-                            val dxDp = pan.x / (density * scaleFactor)
-                            val dyDp = pan.y / (density * scaleFactor)
-                            
-                            val currentX = pos.offsetX.toFloat()
-                            val currentY = pos.offsetY.toFloat()
-                            if (kotlin.math.abs(dragStartX - currentX) > 50f || kotlin.math.abs(dragStartY - currentY) > 50f) {
-                                dragStartX = currentX
-                                dragStartY = currentY
+                    if (useSingleDragMode) {
+                        var startPos = currentPos
+                        var dragAccumulatedX = 0f
+                        var dragAccumulatedY = 0f
+                        detectDragGestures(
+                            onDragStart = {
+                                startPos = currentPos
+                                dragAccumulatedX = 0f
+                                dragAccumulatedY = 0f
+                            },
+                            onDrag = { change, dragAmount ->
+                                change.consume()
+                                val dxDp = dragAmount.x / (density * currentScaleFactor)
+                                val dyDp = dragAmount.y / (density * currentScaleFactor)
+                                
+                                dragAccumulatedX += dxDp
+                                dragAccumulatedY += dyDp
+                                
+                                val newOffsetX = startPos.offsetX + dragAccumulatedX
+                                val newOffsetY = startPos.offsetY + dragAccumulatedY
+                                
+                                val finalX = if (currentGridSize > 1) {
+                                    (newOffsetX.roundToInt() / currentGridSize) * currentGridSize
+                                } else newOffsetX.roundToInt()
+                                
+                                val finalY = if (currentGridSize > 1) {
+                                    (newOffsetY.roundToInt() / currentGridSize) * currentGridSize
+                                } else newOffsetY.roundToInt()
+                                
+                                if (finalX != currentPos.offsetX || finalY != currentPos.offsetY) {
+                                    onMoveOrResize(
+                                        obj.id,
+                                        currentPos.copy(offsetX = finalX, offsetY = finalY),
+                                        currentSize
+                                    )
+                                }
                             }
-                            
-                            dragStartX += dxDp
-                            dragStartY += dyDp
-                            
-                            val finalXOffset = if (gridSize > 1) {
-                                (dragStartX.roundToInt() / gridSize) * gridSize
-                            } else dragStartX.roundToInt()
-                            
-                            val finalYOffset = if (gridSize > 1) {
-                                (dragStartY.roundToInt() / gridSize) * gridSize
-                            } else dragStartY.roundToInt()
-                            
-                            if (finalXOffset != pos.offsetX || finalYOffset != pos.offsetY) {
-                                onMoveOrResize(
-                                    obj.id,
-                                    pos.copy(offsetX = finalXOffset, offsetY = finalYOffset),
-                                    size
+                        )
+                    } else {
+                        var dragStartX = currentPos.offsetX.toFloat()
+                        var dragStartY = currentPos.offsetY.toFloat()
+                        detectTransformGestures { _, pan, zoom, _ ->
+                            if (zoom != 1.0f) {
+                                // 2-finger pinch resize
+                                val newOffsetX = (currentSize.offsetX * zoom).roundToInt()
+                                val newOffsetY = (currentSize.offsetY * zoom).roundToInt()
+                                val newScaleX = (currentSize.scaleX * zoom).coerceIn(0f, 10f)
+                                val newScaleY = (currentSize.scaleY * zoom).coerceIn(0f, 10f)
+                                
+                                val updatedSize = currentSize.copy(
+                                    scaleX = if (currentSize.scaleX > 0f) newScaleX else 0f,
+                                    offsetX = if (currentSize.scaleX == 0f) newOffsetX.coerceAtLeast(10) else currentSize.offsetX,
+                                    scaleY = if (currentSize.scaleY > 0f) newScaleY else 0f,
+                                    offsetY = if (currentSize.scaleY == 0f) newOffsetY.coerceAtLeast(10) else currentSize.offsetY
                                 )
+                                onMoveOrResize(obj.id, currentPos, updatedSize)
+                            } else if (pan != Offset.Zero) {
+                                // 1-finger hold and drag to move
+                                val dxDp = pan.x / (density * currentScaleFactor)
+                                val dyDp = pan.y / (density * currentScaleFactor)
+                                
+                                val currentX = currentPos.offsetX.toFloat()
+                                val currentY = currentPos.offsetY.toFloat()
+                                if (kotlin.math.abs(dragStartX - currentX) > 30f || kotlin.math.abs(dragStartY - currentY) > 30f) {
+                                    dragStartX = currentX
+                                    dragStartY = currentY
+                                }
+                                
+                                dragStartX += dxDp
+                                dragStartY += dyDp
+                                
+                                val finalX = if (currentGridSize > 1) {
+                                    (dragStartX.roundToInt() / currentGridSize) * currentGridSize
+                                } else dragStartX.roundToInt()
+                                
+                                val finalY = if (currentGridSize > 1) {
+                                    (dragStartY.roundToInt() / currentGridSize) * currentGridSize
+                                } else dragStartY.roundToInt()
+                                
+                                if (finalX != currentPos.offsetX || finalY != currentPos.offsetY) {
+                                    onMoveOrResize(
+                                        obj.id,
+                                        currentPos.copy(offsetX = finalX, offsetY = finalY),
+                                        currentSize
+                                    )
+                                }
                             }
                         }
                     }
@@ -530,44 +578,45 @@ fun RenderRobloxObject(
                             .size(28.dp)
                             .align(Alignment.TopStart)
                             .pointerInput(obj.id) {
-                                var resizeStartX = pos.offsetX.toFloat()
-                                var resizeStartY = pos.offsetY.toFloat()
-                                var resizeStartW = size.offsetX.toFloat()
-                                var resizeStartH = size.offsetY.toFloat()
+                                var startPos = currentPos
+                                var startSize = currentSize
+                                var dragAccumulatedX = 0f
+                                var dragAccumulatedY = 0f
                                 detectDragGestures(
                                     onDragStart = {
-                                        resizeStartX = pos.offsetX.toFloat()
-                                        resizeStartY = pos.offsetY.toFloat()
-                                        resizeStartW = size.offsetX.toFloat()
-                                        resizeStartH = size.offsetY.toFloat()
+                                        startPos = currentPos
+                                        startSize = currentSize
+                                        dragAccumulatedX = 0f
+                                        dragAccumulatedY = 0f
                                     },
                                     onDrag = { change, dragAmount ->
                                         change.consume()
-                                        val dxDp = dragAmount.x / (density * scaleFactor)
-                                        val dyDp = dragAmount.y / (density * scaleFactor)
+                                        val dxDp = dragAmount.x / (density * currentScaleFactor)
+                                        val dyDp = dragAmount.y / (density * currentScaleFactor)
                                         
-                                        resizeStartX += dxDp
-                                        resizeStartY += dyDp
-                                        resizeStartW -= dxDp
-                                        resizeStartH -= dyDp
+                                        dragAccumulatedX += dxDp
+                                        dragAccumulatedY += dyDp
                                         
-                                        val finalW = if (gridSize > 1) (resizeStartW.roundToInt() / gridSize) * gridSize else resizeStartW.roundToInt()
-                                        val finalH = if (gridSize > 1) (resizeStartH.roundToInt() / gridSize) * gridSize else resizeStartH.roundToInt()
+                                        val newW = startSize.offsetX - dragAccumulatedX
+                                        val newH = startSize.offsetY - dragAccumulatedY
                                         
-                                        val minOffsetX = (10 - (size.scaleX * parentW)).toInt()
-                                        val minOffsetY = (10 - (size.scaleY * parentH)).toInt()
+                                        val finalW = if (currentGridSize > 1) (newW.roundToInt() / currentGridSize) * currentGridSize else newW.roundToInt()
+                                        val finalH = if (currentGridSize > 1) (newH.roundToInt() / currentGridSize) * currentGridSize else newH.roundToInt()
+                                        
+                                        val minOffsetX = (10 - (startSize.scaleX * currentParentW)).toInt()
+                                        val minOffsetY = (10 - (startSize.scaleY * currentParentH)).toInt()
                                         val safeW = finalW.coerceAtLeast(minOffsetX)
                                         val safeH = finalH.coerceAtLeast(minOffsetY)
                                         
-                                        val diffX = size.offsetX - safeW
-                                        val adjustedX = pos.offsetX + diffX
-                                        val diffY = size.offsetY - safeH
-                                        val adjustedY = pos.offsetY + diffY
+                                        val diffX = startSize.offsetX - safeW
+                                        val adjustedX = startPos.offsetX + diffX
+                                        val diffY = startSize.offsetY - safeH
+                                        val adjustedY = startPos.offsetY + diffY
                                         
                                         onMoveOrResize(
                                             obj.id,
-                                            pos.copy(offsetX = adjustedX, offsetY = adjustedY),
-                                            size.copy(offsetX = safeW, offsetY = safeH)
+                                            currentPos.copy(offsetX = adjustedX, offsetY = adjustedY),
+                                            currentSize.copy(offsetX = safeW, offsetY = safeH)
                                         )
                                     }
                                 )
@@ -588,39 +637,43 @@ fun RenderRobloxObject(
                             .size(28.dp)
                             .align(Alignment.TopEnd)
                             .pointerInput(obj.id) {
-                                var resizeStartY = pos.offsetY.toFloat()
-                                var resizeStartW = size.offsetX.toFloat()
-                                var resizeStartH = size.offsetY.toFloat()
+                                var startPos = currentPos
+                                var startSize = currentSize
+                                var dragAccumulatedX = 0f
+                                var dragAccumulatedY = 0f
                                 detectDragGestures(
                                     onDragStart = {
-                                        resizeStartY = pos.offsetY.toFloat()
-                                        resizeStartW = size.offsetX.toFloat()
-                                        resizeStartH = size.offsetY.toFloat()
+                                        startPos = currentPos
+                                        startSize = currentSize
+                                        dragAccumulatedX = 0f
+                                        dragAccumulatedY = 0f
                                     },
                                     onDrag = { change, dragAmount ->
                                         change.consume()
-                                        val dxDp = dragAmount.x / (density * scaleFactor)
-                                        val dyDp = dragAmount.y / (density * scaleFactor)
+                                        val dxDp = dragAmount.x / (density * currentScaleFactor)
+                                        val dyDp = dragAmount.y / (density * currentScaleFactor)
                                         
-                                        resizeStartY += dyDp
-                                        resizeStartW += dxDp
-                                        resizeStartH -= dyDp
+                                        dragAccumulatedX += dxDp
+                                        dragAccumulatedY += dyDp
                                         
-                                        val finalW = if (gridSize > 1) (resizeStartW.roundToInt() / gridSize) * gridSize else resizeStartW.roundToInt()
-                                        val finalH = if (gridSize > 1) (resizeStartH.roundToInt() / gridSize) * gridSize else resizeStartH.roundToInt()
+                                        val newW = startSize.offsetX + dragAccumulatedX
+                                        val newH = startSize.offsetY - dragAccumulatedY
                                         
-                                        val minOffsetX = (10 - (size.scaleX * parentW)).toInt()
-                                        val minOffsetY = (10 - (size.scaleY * parentH)).toInt()
+                                        val finalW = if (currentGridSize > 1) (newW.roundToInt() / currentGridSize) * currentGridSize else newW.roundToInt()
+                                        val finalH = if (currentGridSize > 1) (newH.roundToInt() / currentGridSize) * currentGridSize else newH.roundToInt()
+                                        
+                                        val minOffsetX = (10 - (startSize.scaleX * currentParentW)).toInt()
+                                        val minOffsetY = (10 - (startSize.scaleY * currentParentH)).toInt()
                                         val safeW = finalW.coerceAtLeast(minOffsetX)
                                         val safeH = finalH.coerceAtLeast(minOffsetY)
                                         
-                                        val diffY = size.offsetY - safeH
-                                        val adjustedY = pos.offsetY + diffY
+                                        val diffY = startSize.offsetY - safeH
+                                        val adjustedY = startPos.offsetY + diffY
                                         
                                         onMoveOrResize(
                                             obj.id,
-                                            pos.copy(offsetY = adjustedY),
-                                            size.copy(offsetX = safeW, offsetY = safeH)
+                                            currentPos.copy(offsetY = adjustedY),
+                                            currentSize.copy(offsetX = safeW, offsetY = safeH)
                                         )
                                     }
                                 )
@@ -641,39 +694,43 @@ fun RenderRobloxObject(
                             .size(28.dp)
                             .align(Alignment.BottomStart)
                             .pointerInput(obj.id) {
-                                var resizeStartX = pos.offsetX.toFloat()
-                                var resizeStartW = size.offsetX.toFloat()
-                                var resizeStartH = size.offsetY.toFloat()
+                                var startPos = currentPos
+                                var startSize = currentSize
+                                var dragAccumulatedX = 0f
+                                var dragAccumulatedY = 0f
                                 detectDragGestures(
                                     onDragStart = {
-                                        resizeStartX = pos.offsetX.toFloat()
-                                        resizeStartW = size.offsetX.toFloat()
-                                        resizeStartH = size.offsetY.toFloat()
+                                        startPos = currentPos
+                                        startSize = currentSize
+                                        dragAccumulatedX = 0f
+                                        dragAccumulatedY = 0f
                                     },
                                     onDrag = { change, dragAmount ->
                                         change.consume()
-                                        val dxDp = dragAmount.x / (density * scaleFactor)
-                                        val dyDp = dragAmount.y / (density * scaleFactor)
+                                        val dxDp = dragAmount.x / (density * currentScaleFactor)
+                                        val dyDp = dragAmount.y / (density * currentScaleFactor)
                                         
-                                        resizeStartX += dxDp
-                                        resizeStartW -= dxDp
-                                        resizeStartH += dyDp
+                                        dragAccumulatedX += dxDp
+                                        dragAccumulatedY += dyDp
                                         
-                                        val finalW = if (gridSize > 1) (resizeStartW.roundToInt() / gridSize) * gridSize else resizeStartW.roundToInt()
-                                        val finalH = if (gridSize > 1) (resizeStartH.roundToInt() / gridSize) * gridSize else resizeStartH.roundToInt()
+                                        val newW = startSize.offsetX - dragAccumulatedX
+                                        val newH = startSize.offsetY + dragAccumulatedY
                                         
-                                        val minOffsetX = (10 - (size.scaleX * parentW)).toInt()
-                                        val minOffsetY = (10 - (size.scaleY * parentH)).toInt()
+                                        val finalW = if (currentGridSize > 1) (newW.roundToInt() / currentGridSize) * currentGridSize else newW.roundToInt()
+                                        val finalH = if (currentGridSize > 1) (newH.roundToInt() / currentGridSize) * currentGridSize else newH.roundToInt()
+                                        
+                                        val minOffsetX = (10 - (startSize.scaleX * currentParentW)).toInt()
+                                        val minOffsetY = (10 - (startSize.scaleY * currentParentH)).toInt()
                                         val safeW = finalW.coerceAtLeast(minOffsetX)
                                         val safeH = finalH.coerceAtLeast(minOffsetY)
                                         
-                                        val diffX = size.offsetX - safeW
-                                        val adjustedX = pos.offsetX + diffX
+                                        val diffX = startSize.offsetX - safeW
+                                        val adjustedX = startPos.offsetX + diffX
                                         
                                         onMoveOrResize(
                                             obj.id,
-                                            pos.copy(offsetX = adjustedX),
-                                            size.copy(offsetX = safeW, offsetY = safeH)
+                                            currentPos.copy(offsetX = adjustedX),
+                                            currentSize.copy(offsetX = safeW, offsetY = safeH)
                                         )
                                     }
                                 )
@@ -694,39 +751,44 @@ fun RenderRobloxObject(
                             .size(28.dp)
                             .align(Alignment.BottomEnd)
                             .pointerInput(obj.id) {
-                                var resizeStartW = size.offsetX.toFloat()
-                                var resizeStartH = size.offsetY.toFloat()
+                                var startSize = currentSize
+                                var dragAccumulatedX = 0f
+                                var dragAccumulatedY = 0f
                                 detectDragGestures(
                                     onDragStart = {
-                                        resizeStartW = size.offsetX.toFloat()
-                                        resizeStartH = size.offsetY.toFloat()
+                                        startSize = currentSize
+                                        dragAccumulatedX = 0f
+                                        dragAccumulatedY = 0f
                                     },
                                     onDrag = { change, dragAmount ->
                                         change.consume()
-                                        val dxDp = dragAmount.x / (density * scaleFactor)
-                                        val dyDp = dragAmount.y / (density * scaleFactor)
+                                        val dxDp = dragAmount.x / (density * currentScaleFactor)
+                                        val dyDp = dragAmount.y / (density * currentScaleFactor)
                                         
-                                        resizeStartW += dxDp
-                                        resizeStartH += dyDp
+                                        dragAccumulatedX += dxDp
+                                        dragAccumulatedY += dyDp
                                         
-                                        val finalW = if (gridSize > 1) {
-                                            (resizeStartW.roundToInt() / gridSize) * gridSize
-                                        } else resizeStartW.roundToInt()
+                                        val newW = startSize.offsetX + dragAccumulatedX
+                                        val newH = startSize.offsetY + dragAccumulatedY
                                         
-                                        val finalH = if (gridSize > 1) {
-                                            (resizeStartH.roundToInt() / gridSize) * gridSize
-                                        } else resizeStartH.roundToInt()
+                                        val finalW = if (currentGridSize > 1) {
+                                            (newW.roundToInt() / currentGridSize) * currentGridSize
+                                        } else newW.roundToInt()
                                         
-                                        val minOffsetX = (10 - (size.scaleX * parentW)).toInt()
-                                        val minOffsetY = (10 - (size.scaleY * parentH)).toInt()
+                                        val finalH = if (currentGridSize > 1) {
+                                            (newH.roundToInt() / currentGridSize) * currentGridSize
+                                        } else newH.roundToInt()
+                                        
+                                        val minOffsetX = (10 - (startSize.scaleX * currentParentW)).toInt()
+                                        val minOffsetY = (10 - (startSize.scaleY * currentParentH)).toInt()
                                         val safeW = finalW.coerceAtLeast(minOffsetX)
                                         val safeH = finalH.coerceAtLeast(minOffsetY)
                                         
-                                        if (safeW != size.offsetX || safeH != size.offsetY) {
+                                        if (safeW != currentSize.offsetX || safeH != currentSize.offsetY) {
                                             onMoveOrResize(
                                                 obj.id,
-                                                pos,
-                                                size.copy(offsetX = safeW, offsetY = safeH)
+                                                currentPos,
+                                                currentSize.copy(offsetX = safeW, offsetY = safeH)
                                             )
                                         }
                                     }
@@ -749,39 +811,44 @@ fun RenderRobloxObject(
                             .background(Color(0, 162, 255), RoundedCornerShape(2.dp))
                             .align(Alignment.BottomEnd)
                             .pointerInput(obj.id) {
-                                var resizeStartW = size.offsetX.toFloat()
-                                var resizeStartH = size.offsetY.toFloat()
+                                var startSize = currentSize
+                                var dragAccumulatedX = 0f
+                                var dragAccumulatedY = 0f
                                 detectDragGestures(
                                     onDragStart = {
-                                        resizeStartW = size.offsetX.toFloat()
-                                        resizeStartH = size.offsetY.toFloat()
+                                        startSize = currentSize
+                                        dragAccumulatedX = 0f
+                                        dragAccumulatedY = 0f
                                     },
                                     onDrag = { change, dragAmount ->
                                         change.consume()
-                                        val dxDp = dragAmount.x / (density * scaleFactor)
-                                        val dyDp = dragAmount.y / (density * scaleFactor)
+                                        val dxDp = dragAmount.x / (density * currentScaleFactor)
+                                        val dyDp = dragAmount.y / (density * currentScaleFactor)
                                         
-                                        resizeStartW += dxDp
-                                        resizeStartH += dyDp
+                                        dragAccumulatedX += dxDp
+                                        dragAccumulatedY += dyDp
                                         
-                                        val finalW = if (gridSize > 1) {
-                                            (resizeStartW.roundToInt() / gridSize) * gridSize
-                                        } else resizeStartW.roundToInt()
+                                        val newW = startSize.offsetX + dragAccumulatedX
+                                        val newH = startSize.offsetY + dragAccumulatedY
                                         
-                                        val finalH = if (gridSize > 1) {
-                                            (resizeStartH.roundToInt() / gridSize) * gridSize
-                                        } else resizeStartH.roundToInt()
+                                        val finalW = if (currentGridSize > 1) {
+                                            (newW.roundToInt() / currentGridSize) * currentGridSize
+                                        } else newW.roundToInt()
                                         
-                                        val minOffsetX = (10 - (size.scaleX * parentW)).toInt()
-                                        val minOffsetY = (10 - (size.scaleY * parentH)).toInt()
+                                        val finalH = if (currentGridSize > 1) {
+                                            (newH.roundToInt() / currentGridSize) * currentGridSize
+                                        } else newH.roundToInt()
+                                        
+                                        val minOffsetX = (10 - (startSize.scaleX * currentParentW)).toInt()
+                                        val minOffsetY = (10 - (startSize.scaleY * currentParentH)).toInt()
                                         val safeW = finalW.coerceAtLeast(minOffsetX)
                                         val safeH = finalH.coerceAtLeast(minOffsetY)
                                         
-                                        if (safeW != size.offsetX || safeH != size.offsetY) {
+                                        if (safeW != currentSize.offsetX || safeH != currentSize.offsetY) {
                                             onMoveOrResize(
                                                 obj.id,
-                                                pos,
-                                                size.copy(offsetX = safeW, offsetY = safeH)
+                                                currentPos,
+                                                currentSize.copy(offsetX = safeW, offsetY = safeH)
                                             )
                                         }
                                     }
