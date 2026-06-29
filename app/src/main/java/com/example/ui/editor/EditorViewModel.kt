@@ -78,6 +78,13 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     private val _devicePreviewType = MutableStateFlow("Phone 16:9") // "Phone 16:9", "Phone 20:9", "Tablet", "Desktop"
     val devicePreviewType: StateFlow<String> = _devicePreviewType.asStateFlow()
 
+    private val _language = MutableStateFlow("vi") // "en" or "vi"
+    val language: StateFlow<String> = _language.asStateFlow()
+
+    fun toggleLanguage() {
+        _language.value = if (_language.value == "en") "vi" else "en"
+    }
+
     // Undo / Redo Stacks
     private val undoStack = mutableListOf<RobloxObject>()
     private val redoStack = mutableListOf<RobloxObject>()

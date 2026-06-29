@@ -20,7 +20,12 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.data.model.RobloxClass
+import androidx.compose.ui.platform.LocalContext
+import android.content.Intent
+import androidx.compose.material.icons.filled.Share
 
 @Composable
 fun VSCodeEditorScreen(
@@ -30,6 +35,7 @@ fun VSCodeEditorScreen(
     onSave: (String) -> Unit,
     onBack: () -> Unit
 ) {
+    val context = LocalContext.current
     var sourceText by remember(initialSource) { mutableStateOf(initialSource) }
     val lineCount = remember(sourceText) { sourceText.lines().size.coerceAtLeast(1) }
     var hasUnsavedChanges by remember(initialSource, sourceText) { mutableStateOf(sourceText != initialSource) }
@@ -76,7 +82,7 @@ fun VSCodeEditorScreen(
                 )
             }
 
-            // Action Buttons (Save & Back)
+            // Action Buttons (Save & Share & Back)
             Row(
                 modifier = Modifier.padding(end = 10.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -96,6 +102,25 @@ fun VSCodeEditorScreen(
                     Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.White)
                     Spacer(modifier = Modifier.width(6.dp))
                     Text("Lưu mã", fontSize = 11.sp, color = Color.White)
+                }
+
+                Button(
+                    onClick = {
+                        val sendIntent = Intent().apply {
+                            action = Intent.ACTION_SEND
+                            putExtra(Intent.EXTRA_TEXT, sourceText)
+                            type = "text/plain"
+                        }
+                        val shareIntent = Intent.createChooser(sendIntent, "Chia sẻ mã script")
+                        context.startActivity(shareIntent)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2ECC71)),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                    modifier = Modifier.height(30.dp)
+                ) {
+                    Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.White)
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Chia sẻ", fontSize = 11.sp, color = Color.White)
                 }
 
                 OutlinedButton(

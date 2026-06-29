@@ -157,11 +157,22 @@ fun createDefaultObject(className: RobloxClass, customName: String? = null): Rob
     val defaultName = customName ?: className.name
     val properties = mutableMapOf<String, Any>()
     
-    // Core structural values
-    properties["Visible"] = true
-    properties["Active"] = true
-    properties["ZIndex"] = 1
-    properties["LayoutOrder"] = 0
+    // Core structural values for GUI Objects (subclasses of GuiObject)
+    val isGuiObject = className in setOf(
+        RobloxClass.Frame,
+        RobloxClass.TextLabel,
+        RobloxClass.TextButton,
+        RobloxClass.ImageLabel,
+        RobloxClass.ImageButton,
+        RobloxClass.ScrollingFrame,
+        RobloxClass.ViewportFrame
+    )
+    if (isGuiObject) {
+        properties["Visible"] = true
+        properties["Active"] = true
+        properties["ZIndex"] = 1
+        properties["LayoutOrder"] = 0
+    }
     
     when (className) {
         RobloxClass.ScreenGui -> {

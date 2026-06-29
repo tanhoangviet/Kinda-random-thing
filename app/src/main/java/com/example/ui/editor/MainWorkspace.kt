@@ -54,6 +54,7 @@ fun MainWorkspace(
     val useSingleDragMode by viewModel.useSingleDragMode.collectAsState()
     val isTopbarVisible by viewModel.isTopbarVisible.collectAsState()
     val showSettingsDialog by viewModel.showSettingsDialog.collectAsState()
+    val language by viewModel.language.collectAsState()
 
     // Dialog trigger states
     var showInsertDialog by remember { mutableStateOf(false) }
@@ -69,6 +70,8 @@ fun MainWorkspace(
 
     // Floating toolbar quick actions
     var showQuickMenu by remember { mutableStateOf(true) }
+
+    var activeTabMobile by remember { mutableStateOf("Viewport") }
 
     // Scaffold with a clean dark theme
     Box(modifier = modifier.fillMaxSize()) {
@@ -200,238 +203,310 @@ fun MainWorkspace(
         },
         containerColor = Color(15, 15, 15)
     ) { innerPadding ->
-        Row(
+        val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+        val isCompact = configuration.screenWidthDp < 720
+
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
                 .then(if (!isTopbarVisible) Modifier.statusBarsPadding() else Modifier)
         ) {
-            // Left Panel (Dex Explorer hierarchy)
-            AnimatedVisibility(
-                visible = !isPreviewMode,
-                modifier = Modifier
-                    .width(210.dp)
-                    .fillMaxHeight()
-            ) {
-                DexExplorerPanel(
-                    root = rootObj,
-                    selectedId = selectedId,
-                    onSelect = { viewModel.selectObject(it) },
-                    onDelete = { viewModel.deleteObject(it) },
-                    onDuplicate = { viewModel.duplicateObject(it) },
-                    onRename = { id, name -> viewModel.renameObject(id, name) },
-                    onMove = { id, up -> viewModel.moveObjectInHierarchy(id, up) },
-                    onCopy = { viewModel.copyObject(it) },
-                    onPaste = { viewModel.pasteObject(it) },
-                    onOpenScript = { viewModel.openScriptEditor(it) },
-                    onToggleDragMode = { viewModel.setUseSingleDragMode(!useSingleDragMode) }
-                )
-            }
-
-            // Center Workspace Area (The Viewport canvas)
-            Box(
+            // Main Content Area
+            Row(
                 modifier = Modifier
                     .weight(1f)
-                    .fillMaxHeight()
-                    .background(Color(18, 18, 18))
-                    .border(0.5.dp, Color(40, 40, 45))
-                    .pointerInput(Unit) {
-                        detectTapGestures(
-                            onDoubleTap = {
-                                viewModel.selectObject(null)
-                            }
+                    .fillMaxWidth()
+            ) {
+                // 1. Left Panel (Dex Explorer hierarchy)
+                // Visible on Desktop if not in preview mode, or on Mobile if active tab is Explorer
+                if ((!isCompact && !isPreviewMode) || (isCompact && activeTabMobile == "Explorer")) {
+                    Box(
+                        modifier = Modifier
+                            .then(if (!isCompact) Modifier.width(210.dp) else Modifier.weight(1f))
+                            .fillMaxHeight()
+                    ) {
+                        DexExplorerPanel(
+                            root = rootObj,
+                            selectedId = selectedId,
+                            onSelect = { 
+                                viewModel.selectObject(it)
+                                if (isCompact) {
+                                    activeTabMobile = "Viewport"
+                                }
+                            },
+                            onDelete = { viewModel.deleteObject(it) },
+                            onDuplicate = { viewModel.duplicateObject(it) },
+                            onRename = { id, name -> viewModel.renameObject(id, name) },
+                            onMove = { id, up -> viewModel.moveObjectInHierarchy(id, up) },
+                            onCopy = { viewModel.copyObject(it) },
+                            onPaste = { viewModel.pasteObject(it) },
+                            onOpenScript = { viewModel.openScriptEditor(it) },
+                            onToggleDragMode = { viewModel.setUseSingleDragMode(!useSingleDragMode) }
                         )
                     }
-                    .pointerInput(selectedId, useSingleDragMode) {
-                        detectTransformGestures { _, pan, zoom, _ ->
-                            if (zoom != 1.0f) {
-                                // Deselect selected object when starting zoom
-                                viewModel.selectObject(null)
-                            }
-                            
-                            // Lock camera movement if single-drag mode is activated and an object is selected
-                            val isCameraLocked = selectedId != null && useSingleDragMode
-                            if (!isCameraLocked) {
-                                canvasScale = (canvasScale * zoom).coerceIn(0.2f, 3.0f)
-                                canvasOffsetX += pan.x
-                                canvasOffsetY += pan.y
-                            }
-                        }
-                    }
-            ) {
-                // Interactive background viewport
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer(
-                            scaleX = canvasScale,
-                            scaleY = canvasScale,
-                            translationX = canvasOffsetX,
-                            translationY = canvasOffsetY
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    RobloxCanvasPreview(
-                        root = rootObj,
-                        selectedId = selectedId,
-                        onSelect = { viewModel.selectObject(it) },
-                        onMoveOrResize = { id, pos, size -> viewModel.updateProperty(id, "Position", pos); viewModel.updateProperty(id, "Size", size) },
-                        screenWidth = screenWidth,
-                        screenHeight = screenHeight,
-                        scaleFactor = canvasScale,
-                        showGrid = showGrid,
-                        gridSize = gridSize,
-                        isPreviewMode = isPreviewMode,
-                        useSingleDragMode = useSingleDragMode,
-                        onToggleDragMode = { viewModel.setUseSingleDragMode(!useSingleDragMode) }
-                    )
                 }
 
-                // Floating quick settings overlay at the top-right corner of the workspace
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(8.dp)
-                        .background(Color(25, 25, 28, 200), RoundedCornerShape(8.dp))
-                        .border(1.dp, Color(55, 55, 60), RoundedCornerShape(8.dp))
-                        .padding(4.dp)
-                ) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(
-                            onClick = { viewModel.setTopbarVisible(!isTopbarVisible) },
-                            modifier = Modifier.size(28.dp)
-                        ) {
-                            Icon(
-                                imageVector = if (isTopbarVisible) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                contentDescription = "Toggle Topbar",
-                                tint = Color.White,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                        IconButton(
-                            onClick = { viewModel.setShowSettingsDialog(true) },
-                            modifier = Modifier.size(28.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Settings,
-                                contentDescription = "Open Settings",
-                                tint = Color.White,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
-                }
-
-                // Interactive Overlays
-                
-                // Bottom control panel (Zoom and Device selector)
-                Row(
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(12.dp)
-                        .background(Color(30, 30, 35, 220), RoundedCornerShape(8.dp))
-                        .border(1.dp, Color(60, 60, 65, 150), RoundedCornerShape(8.dp))
-                        .padding(horizontal = 10.dp, vertical = 6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Zoom UI
-                    Text("Scale: ${(canvasScale * 100).toInt()}%", color = Color.White, fontSize = 9.sp)
-                    IconButton(onClick = { canvasScale = (canvasScale + 0.1f).coerceIn(0.2f, 3.0f) }, modifier = Modifier.size(24.dp)) {
-                        Icon(Icons.Default.ZoomIn, contentDescription = "Zoom In", tint = Color.White, modifier = Modifier.size(16.dp))
-                    }
-                    IconButton(onClick = { canvasScale = (canvasScale - 0.1f).coerceIn(0.2f, 3.0f) }, modifier = Modifier.size(24.dp)) {
-                        Icon(Icons.Default.ZoomOut, contentDescription = "Zoom Out", tint = Color.White, modifier = Modifier.size(16.dp))
-                    }
-                    IconButton(onClick = { canvasScale = 0.6f; canvasOffsetX = 0f; canvasOffsetY = 0f }, modifier = Modifier.size(24.dp)) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Reset View", tint = Color.White, modifier = Modifier.size(16.dp))
-                    }
-
-                    VerticalDivider(modifier = Modifier.height(14.dp), color = Color.Gray)
-
-                    // Device Preview drop-down selection
-                    var showDevices by remember { mutableStateOf(false) }
-                    Box {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.clickable { showDevices = true }
-                        ) {
-                            Icon(Icons.Default.Devices, contentDescription = null, tint = Color(0, 162, 255), modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(devicePreview, fontSize = 9.sp, color = Color.White, fontWeight = FontWeight.Bold)
-                        }
-                        DropdownMenu(expanded = showDevices, onDismissRequest = { showDevices = false }) {
-                            listOf("Phone 16:9", "Phone 20:9", "Tablet", "Desktop").forEach { dev ->
-                                DropdownMenuItem(
-                                    text = { Text(dev, fontSize = 11.sp) },
-                                    onClick = { viewModel.setDevicePreview(dev); showDevices = false }
+                // 2. Center Workspace Area (The Viewport canvas)
+                // Always visible on Desktop, or on Mobile if active tab is Viewport
+                if (!isCompact || activeTabMobile == "Viewport") {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .background(Color(18, 18, 18))
+                            .border(0.5.dp, Color(40, 40, 45))
+                            .pointerInput(Unit) {
+                                detectTapGestures(
+                                    onDoubleTap = {
+                                        viewModel.selectObject(null)
+                                    }
                                 )
                             }
+                            .pointerInput(selectedId, useSingleDragMode) {
+                                detectTransformGestures { _, pan, zoom, _ ->
+                                    if (zoom != 1.0f) {
+                                        // Deselect selected object when starting zoom
+                                        viewModel.selectObject(null)
+                                    }
+                                    
+                                    // Lock camera movement if single-drag mode is activated and an object is selected
+                                    val isCameraLocked = selectedId != null && useSingleDragMode
+                                    if (!isCameraLocked) {
+                                        canvasScale = (canvasScale * zoom).coerceIn(0.2f, 3.0f)
+                                        canvasOffsetX += pan.x
+                                        canvasOffsetY += pan.y
+                                    }
+                                }
+                            }
+                    ) {
+                        // Interactive background viewport
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer(
+                                    scaleX = canvasScale,
+                                    scaleY = canvasScale,
+                                    translationX = canvasOffsetX,
+                                    translationY = canvasOffsetY
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            RobloxCanvasPreview(
+                                root = rootObj,
+                                selectedId = selectedId,
+                                onSelect = { viewModel.selectObject(it) },
+                                onMoveOrResize = { id, pos, size -> viewModel.updateProperty(id, "Position", pos); viewModel.updateProperty(id, "Size", size) },
+                                screenWidth = screenWidth,
+                                screenHeight = screenHeight,
+                                scaleFactor = canvasScale,
+                                showGrid = showGrid,
+                                gridSize = gridSize,
+                                isPreviewMode = isPreviewMode,
+                                useSingleDragMode = useSingleDragMode,
+                                onToggleDragMode = { viewModel.setUseSingleDragMode(!useSingleDragMode) }
+                            )
+                        }
+
+                        // Floating quick settings overlay at the top-right corner of the workspace
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(8.dp)
+                                .background(Color(25, 25, 28, 200), RoundedCornerShape(8.dp))
+                                .border(1.dp, Color(55, 55, 60), RoundedCornerShape(8.dp))
+                                .padding(4.dp)
+                        ) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                IconButton(
+                                    onClick = { viewModel.setTopbarVisible(!isTopbarVisible) },
+                                    modifier = Modifier.size(28.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = if (isTopbarVisible) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                        contentDescription = "Toggle Topbar",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                                IconButton(
+                                    onClick = { viewModel.setShowSettingsDialog(true) },
+                                    modifier = Modifier.size(28.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Settings,
+                                        contentDescription = "Open Settings",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        // Bottom control panel (Zoom and Device selector)
+                        Row(
+                            modifier = Modifier
+                                .align(Alignment.BottomStart)
+                                .padding(12.dp)
+                                .background(Color(30, 30, 35, 220), RoundedCornerShape(8.dp))
+                                .border(1.dp, Color(60, 60, 65, 150), RoundedCornerShape(8.dp))
+                                .padding(horizontal = 10.dp, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Zoom UI
+                            Text("Scale: ${(canvasScale * 100).toInt()}%", color = Color.White, fontSize = 9.sp)
+                            IconButton(onClick = { canvasScale = (canvasScale + 0.1f).coerceIn(0.2f, 3.0f) }, modifier = Modifier.size(24.dp)) {
+                                Icon(Icons.Default.ZoomIn, contentDescription = "Zoom In", tint = Color.White, modifier = Modifier.size(16.dp))
+                            }
+                            IconButton(onClick = { canvasScale = (canvasScale - 0.1f).coerceIn(0.2f, 3.0f) }, modifier = Modifier.size(24.dp)) {
+                                Icon(Icons.Default.ZoomOut, contentDescription = "Zoom Out", tint = Color.White, modifier = Modifier.size(16.dp))
+                            }
+                            IconButton(onClick = { canvasScale = 0.6f; canvasOffsetX = 0f; canvasOffsetY = 0f }, modifier = Modifier.size(24.dp)) {
+                                Icon(Icons.Default.Refresh, contentDescription = "Reset View", tint = Color.White, modifier = Modifier.size(16.dp))
+                            }
+
+                            VerticalDivider(modifier = Modifier.height(14.dp), color = Color.Gray)
+
+                            // Device Preview drop-down selection
+                            var showDevices by remember { mutableStateOf(false) }
+                            Box {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.clickable { showDevices = true }
+                                ) {
+                                    Icon(Icons.Default.Devices, contentDescription = null, tint = Color(0, 162, 255), modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(devicePreview, fontSize = 9.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                }
+                                DropdownMenu(expanded = showDevices, onDismissRequest = { showDevices = false }) {
+                                    listOf("Phone 16:9", "Phone 20:9", "Tablet", "Desktop").forEach { dev ->
+                                        DropdownMenuItem(
+                                            text = { Text(dev, fontSize = 11.sp) },
+                                            onClick = { viewModel.setDevicePreview(dev); showDevices = false }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // Quick Floating Mini Toolbar (Duplicate, Delete, Insert Object etc.)
+                        if (!isPreviewMode) {
+                            Row(
+                                modifier = Modifier
+                                    .align(Alignment.TopCenter)
+                                    .padding(12.dp)
+                                    .background(Color(25, 25, 30, 240), RoundedCornerShape(30.dp))
+                                    .border(1.dp, Color(60, 60, 65, 180), RoundedCornerShape(30.dp))
+                                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                IconButton(
+                                    onClick = { showInsertDialog = true },
+                                    modifier = Modifier.size(28.dp).background(Color(0, 162, 255), RoundedCornerShape(100.dp))
+                                ) {
+                                    Icon(Icons.Default.Add, contentDescription = "Insert Object", tint = Color.White, modifier = Modifier.size(16.dp))
+                                }
+                                
+                                VerticalDivider(modifier = Modifier.height(16.dp).padding(horizontal = 4.dp), color = Color.Gray)
+
+                                IconButton(
+                                    onClick = { selectedId?.let { viewModel.duplicateObject(it) } },
+                                    enabled = selectedId != null && selectedId != rootObj.id,
+                                    modifier = Modifier.size(28.dp)
+                                ) {
+                                    Icon(Icons.Default.ControlPointDuplicate, contentDescription = "Duplicate", tint = if (selectedId != null && selectedId != rootObj.id) Color.White else Color.Gray, modifier = Modifier.size(16.dp))
+                                }
+                                IconButton(
+                                    onClick = { selectedId?.let { viewModel.deleteObject(it) } },
+                                    enabled = selectedId != null && selectedId != rootObj.id,
+                                    modifier = Modifier.size(28.dp)
+                                ) {
+                                    Icon(Icons.Default.Delete, contentDescription = "Delete", tint = if (selectedId != null && selectedId != rootObj.id) Color.Red else Color.Gray, modifier = Modifier.size(16.dp))
+                                }
+                            }
                         }
                     }
                 }
 
-                // Quick Floating Mini Toolbar (Duplicate, Delete, Insert Object etc.)
-                if (!isPreviewMode) {
-                    Row(
+                // 3. Right Panel (Properties Inspector)
+                // Visible on Desktop if not in preview mode, or on Mobile if active tab is Properties
+                if ((!isCompact && !isPreviewMode) || (isCompact && activeTabMobile == "Properties")) {
+                    Box(
                         modifier = Modifier
-                            .align(Alignment.TopCenter)
-                            .padding(12.dp)
-                            .background(Color(25, 25, 30, 240), RoundedCornerShape(30.dp))
-                            .border(1.dp, Color(60, 60, 65, 180), RoundedCornerShape(30.dp))
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .then(if (!isCompact) Modifier.width(230.dp) else Modifier.weight(1f))
+                            .fillMaxHeight()
                     ) {
-                        IconButton(
-                            onClick = { showInsertDialog = true },
-                            modifier = Modifier.size(28.dp).background(Color(0, 162, 255), RoundedCornerShape(100.dp))
-                        ) {
-                            Icon(Icons.Default.Add, contentDescription = "Insert Object", tint = Color.White, modifier = Modifier.size(16.dp))
+                        val parentName = selectedId?.let { id ->
+                            findParentNameInTree(rootObj, id)
                         }
-                        
-                        VerticalDivider(modifier = Modifier.height(16.dp).padding(horizontal = 4.dp), color = Color.Gray)
-
-                        IconButton(
-                            onClick = { selectedId?.let { viewModel.duplicateObject(it) } },
-                            enabled = selectedId != null && selectedId != rootObj.id,
-                            modifier = Modifier.size(28.dp)
-                        ) {
-                            Icon(Icons.Default.ControlPointDuplicate, contentDescription = "Duplicate", tint = if (selectedId != null && selectedId != rootObj.id) Color.White else Color.Gray, modifier = Modifier.size(16.dp))
-                        }
-                        IconButton(
-                            onClick = { selectedId?.let { viewModel.deleteObject(it) } },
-                            enabled = selectedId != null && selectedId != rootObj.id,
-                            modifier = Modifier.size(28.dp)
-                        ) {
-                            Icon(Icons.Default.Delete, contentDescription = "Delete", tint = if (selectedId != null && selectedId != rootObj.id) Color.Red else Color.Gray, modifier = Modifier.size(16.dp))
-                        }
+                        PropertiesPanel(
+                            selectedObj = selectedObj,
+                            parentName = parentName,
+                            onUpdateProperty = { id, name, value -> viewModel.updateProperty(id, name, value) },
+                            onConvertOffsetToScale = { viewModel.convertOffsetToScale(it) },
+                            onConvertScaleToOffset = { viewModel.convertScaleToOffset(it) },
+                            onApplyAnchorPreset = { id, pr -> viewModel.applyAnchorPreset(id, pr) },
+                            onOpenScript = { viewModel.openScriptEditor(it) },
+                            lang = language
+                        )
                     }
                 }
             }
 
-            // Right Panel (Properties Inspector)
-            AnimatedVisibility(
-                visible = !isPreviewMode,
-                modifier = Modifier
-                    .width(230.dp)
-                    .fillMaxHeight()
-            ) {
-                val parentName = selectedId?.let { id ->
-                    findParentNameInTree(rootObj, id)
+            // Bottom Navigation tabs on small screens (DPI-adaptive)
+            if (isCompact) {
+                NavigationBar(
+                    containerColor = Color(20, 20, 24),
+                    tonalElevation = 8.dp,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                ) {
+                    NavigationBarItem(
+                        selected = activeTabMobile == "Explorer",
+                        onClick = { activeTabMobile = "Explorer" },
+                        icon = { Icon(Icons.Default.List, contentDescription = "Explorer") },
+                        label = { Text("Explorer", fontSize = 10.sp) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = Color(0, 162, 255),
+                            selectedTextColor = Color(0, 162, 255),
+                            indicatorColor = Color(0, 162, 255).copy(alpha = 0.15f),
+                            unselectedIconColor = Color.Gray,
+                            unselectedTextColor = Color.Gray
+                        )
+                    )
+                    NavigationBarItem(
+                        selected = activeTabMobile == "Viewport",
+                        onClick = { activeTabMobile = "Viewport" },
+                        icon = { Icon(Icons.Default.AspectRatio, contentDescription = "Viewport") },
+                        label = { Text("Viewport", fontSize = 10.sp) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = Color(0, 162, 255),
+                            selectedTextColor = Color(0, 162, 255),
+                            indicatorColor = Color(0, 162, 255).copy(alpha = 0.15f),
+                            unselectedIconColor = Color.Gray,
+                            unselectedTextColor = Color.Gray
+                        )
+                    )
+                    NavigationBarItem(
+                        selected = activeTabMobile == "Properties",
+                        onClick = { activeTabMobile = "Properties" },
+                        icon = { Icon(Icons.Default.Tune, contentDescription = "Properties") },
+                        label = { Text("Properties", fontSize = 10.sp) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = Color(0, 162, 255),
+                            selectedTextColor = Color(0, 162, 255),
+                            indicatorColor = Color(0, 162, 255).copy(alpha = 0.15f),
+                            unselectedIconColor = Color.Gray,
+                            unselectedTextColor = Color.Gray
+                        )
+                    )
                 }
-                PropertiesPanel(
-                    selectedObj = selectedObj,
-                    parentName = parentName,
-                    onUpdateProperty = { id, name, value -> viewModel.updateProperty(id, name, value) },
-                    onConvertOffsetToScale = { viewModel.convertOffsetToScale(it) },
-                    onConvertScaleToOffset = { viewModel.convertScaleToOffset(it) },
-                    onApplyAnchorPreset = { id, pr -> viewModel.applyAnchorPreset(id, pr) },
-                    onOpenScript = { viewModel.openScriptEditor(it) }
-                )
             }
         }
     }

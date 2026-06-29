@@ -1,5 +1,7 @@
 package com.example.ui.editor
 
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -16,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -31,6 +34,7 @@ fun PropertiesPanel(
     onConvertScaleToOffset: (String) -> Unit,
     onApplyAnchorPreset: (String, String) -> Unit,
     onOpenScript: (String) -> Unit = {},
+    lang: String = "vi",
     modifier: Modifier = Modifier
 ) {
     if (selectedObj == null) {
@@ -100,22 +104,12 @@ fun PropertiesPanel(
         // Basic Properties Group
         PropertySection(title = "Basic") {
             PropertyRow(label = "Name") {
-                OutlinedTextField(
+                RobloxTextField(
                     value = selectedObj.name,
-                    onValueChange = { onUpdateProperty(selectedObj.id, "Name", it) }, // Note: VM rename handler does rename, here we update basic field
-                    singleLine = true,
+                    onValueChange = { onUpdateProperty(selectedObj.id, "Name", it) },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(34.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color(0, 162, 255),
-                        unfocusedBorderColor = Color(55, 55, 60),
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        focusedContainerColor = Color(18, 18, 22),
-                        unfocusedContainerColor = Color(18, 18, 22)
-                    ),
-                    textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp)
+                        .height(30.dp)
                 )
             }
 
@@ -128,32 +122,40 @@ fun PropertiesPanel(
                 )
             }
 
-            val visible = selectedObj.properties["Visible"] as? Boolean ?: true
-            PropertyRow(label = "Visible") {
-                Switch(
-                    checked = visible,
-                    onCheckedChange = { onUpdateProperty(selectedObj.id, "Visible", it) },
-                    modifier = Modifier.scale(0.7f)
-                )
-            }
+            val isGuiObject = selectedObj.className in listOf(
+                RobloxClass.Frame, RobloxClass.TextLabel, RobloxClass.TextButton,
+                RobloxClass.ImageLabel, RobloxClass.ImageButton, RobloxClass.ScrollingFrame,
+                RobloxClass.ViewportFrame
+            )
 
-            val active = selectedObj.properties["Active"] as? Boolean ?: true
-            PropertyRow(label = "Active") {
-                Switch(
-                    checked = active,
-                    onCheckedChange = { onUpdateProperty(selectedObj.id, "Active", it) },
-                    modifier = Modifier.scale(0.7f)
-                )
-            }
+            if (isGuiObject) {
+                val visible = selectedObj.properties["Visible"] as? Boolean ?: true
+                PropertyRow(label = "Visible") {
+                    Switch(
+                        checked = visible,
+                        onCheckedChange = { onUpdateProperty(selectedObj.id, "Visible", it) },
+                        modifier = Modifier.scale(0.7f)
+                    )
+                }
 
-            val zIndex = selectedObj.properties["ZIndex"] as? Int ?: 1
-            PropertyRow(label = "ZIndex") {
-                StepperInput(
-                    value = zIndex,
-                    onValueChange = { onUpdateProperty(selectedObj.id, "ZIndex", it) },
-                    min = 1,
-                    max = 100
-                )
+                val active = selectedObj.properties["Active"] as? Boolean ?: true
+                PropertyRow(label = "Active") {
+                    Switch(
+                        checked = active,
+                        onCheckedChange = { onUpdateProperty(selectedObj.id, "Active", it) },
+                        modifier = Modifier.scale(0.7f)
+                    )
+                }
+
+                val zIndex = selectedObj.properties["ZIndex"] as? Int ?: 1
+                PropertyRow(label = "ZIndex") {
+                    StepperInput(
+                        value = zIndex,
+                        onValueChange = { onUpdateProperty(selectedObj.id, "ZIndex", it) },
+                        min = 1,
+                        max = 100
+                    )
+                }
             }
 
             if (selectedObj.className == RobloxClass.LocalScript || selectedObj.className == RobloxClass.ModuleScript) {
@@ -166,7 +168,7 @@ fun PropertiesPanel(
                 ) {
                     Icon(Icons.Default.Code, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Edit Script Source", fontSize = 10.sp)
+                    Text(Locales.translate("edit_script", lang), fontSize = 10.sp)
                 }
             }
         }
@@ -178,7 +180,7 @@ fun PropertiesPanel(
             RobloxClass.ViewportFrame
         )
         if (hasSizeAndPos) {
-            PropertySection(title = "Transform") {
+            PropertySection(title = Locales.translate("transform", lang)) {
                 val pos = selectedObj.properties["Position"] as? UDim2 ?: UDim2(0f, 0, 0f, 0)
                 UDim2Editor(
                     label = "Position",
@@ -207,7 +209,7 @@ fun PropertiesPanel(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Anchor Preset", fontSize = 10.sp, color = Color.Gray)
+                    Text(Locales.translate("anchor_preset", lang), fontSize = 10.sp, color = Color.Gray)
                     var expandedPresets by remember { mutableStateOf(false) }
                     Box {
                         Button(
@@ -216,7 +218,7 @@ fun PropertiesPanel(
                             modifier = Modifier.height(26.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = Color(50, 50, 55))
                         ) {
-                            Text("Select...", fontSize = 9.sp, color = Color.White)
+                            Text(Locales.translate("select", lang), fontSize = 9.sp, color = Color.White)
                         }
                         DropdownMenu(
                             expanded = expandedPresets,
@@ -247,7 +249,7 @@ fun PropertiesPanel(
                         contentPadding = PaddingValues(0.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0, 162, 255))
                     ) {
-                        Text("Offset ➔ Scale", fontSize = 8.sp, color = Color.White)
+                        Text(Locales.translate("offset_scale", lang), fontSize = 8.sp, color = Color.White)
                     }
                     Button(
                         onClick = { onConvertScaleToOffset(selectedObj.id) },
@@ -255,7 +257,7 @@ fun PropertiesPanel(
                         contentPadding = PaddingValues(0.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0, 162, 255))
                     ) {
-                        Text("Scale ➔ Offset", fontSize = 8.sp, color = Color.White)
+                        Text(Locales.translate("scale_offset", lang), fontSize = 8.sp, color = Color.White)
                     }
                 }
             }
@@ -265,14 +267,45 @@ fun PropertiesPanel(
         if (selectedObj.className == RobloxClass.UIGradient) {
             PropertySection(title = "Gradient") {
                 val colorStr = selectedObj.properties["Color"] as? String ?: "255,255,255 to 150,150,150"
+                val stops = try {
+                    if (colorStr.contains(";")) {
+                        colorStr.split(";").map { part ->
+                            val segments = part.split(":")
+                            val pos = segments[0].toFloat()
+                            val rgb = segments[1].split(",").map { it.trim().toInt() }
+                            pos to Color(rgb[0], rgb[1], rgb[2])
+                        }.toTypedArray()
+                    } else {
+                        val colors = colorStr.split(" to ").map { part ->
+                            val rgb = part.split(",").map { it.trim().toInt() }
+                            Color(rgb[0], rgb[1], rgb[2])
+                        }
+                        arrayOf(0f to colors[0], 1f to colors[1])
+                    }
+                } catch (e: Exception) {
+                    arrayOf(0f to Color.White, 1f to Color.Gray)
+                }
+
                 PropertyRow(label = "Color") {
-                    Button(
-                        onClick = { activeGradientProp = "Color" to colorStr },
-                        modifier = Modifier.fillMaxWidth().height(32.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0, 162, 255)),
-                        contentPadding = PaddingValues(0.dp)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(28.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(Brush.horizontalGradient(colorStops = stops))
+                            .border(1.dp, Color(60, 60, 65), RoundedCornerShape(4.dp))
+                            .clickable { activeGradientProp = "Color" to colorStr },
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text("Edit Gradient", fontSize = 10.sp)
+                        Text(
+                            "Edit Gradient", 
+                            color = Color.White, 
+                            fontSize = 9.sp, 
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier
+                                .background(Color.Black.copy(0.4f), RoundedCornerShape(4.dp))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
                     }
                 }
                 
@@ -378,22 +411,12 @@ fun PropertiesPanel(
             PropertySection(title = "Text Settings") {
                 val text = selectedObj.properties["Text"] as? String ?: "Text"
                 PropertyRow(label = "Text") {
-                    OutlinedTextField(
+                    RobloxTextField(
                         value = text,
                         onValueChange = { onUpdateProperty(selectedObj.id, "Text", it) },
-                        singleLine = true,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(34.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0, 162, 255),
-                            unfocusedBorderColor = Color(55, 55, 60),
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
-                            focusedContainerColor = Color(18, 18, 22),
-                            unfocusedContainerColor = Color(18, 18, 22)
-                        ),
-                        textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp)
+                            .height(30.dp)
                     )
                 }
 
@@ -627,14 +650,21 @@ fun PropertiesPanel(
                 }
             }
 
-            val lOrder = selectedObj.properties["LayoutOrder"] as? Int ?: 0
-            PropertyRow(label = "LayoutOrder") {
-                StepperInput(
-                    value = lOrder,
-                    onValueChange = { onUpdateProperty(selectedObj.id, "LayoutOrder", it) },
-                    min = -100,
-                    max = 100
-                )
+            val isGuiObject = selectedObj.className in listOf(
+                RobloxClass.Frame, RobloxClass.TextLabel, RobloxClass.TextButton,
+                RobloxClass.ImageLabel, RobloxClass.ImageButton, RobloxClass.ScrollingFrame,
+                RobloxClass.ViewportFrame
+            )
+            if (isGuiObject) {
+                val lOrder = selectedObj.properties["LayoutOrder"] as? Int ?: 0
+                PropertyRow(label = "LayoutOrder") {
+                    StepperInput(
+                        value = lOrder,
+                        onValueChange = { onUpdateProperty(selectedObj.id, "LayoutOrder", it) },
+                        min = -100,
+                        max = 100
+                    )
+                }
             }
         }
     }
@@ -661,7 +691,8 @@ fun PropertiesPanel(
             onSave = { newStr ->
                 onUpdateProperty(selectedObj.id, propName, newStr)
                 activeGradientProp = null
-            }
+            },
+            lang = lang
         )
     }
 }
@@ -810,21 +841,28 @@ fun Vector2Editor(label: String, vector2: Vector2, onValueChange: (Vector2) -> U
 @Composable
 fun CoordinateInputBox(label: String, value: String, onValueChange: (String) -> Unit, modifier: Modifier = Modifier) {
     Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        OutlinedTextField(
+        BasicTextField(
             value = value,
             onValueChange = onValueChange,
             singleLine = true,
-            modifier = Modifier.height(26.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = Color(0, 162, 255),
-                unfocusedBorderColor = Color(50, 50, 55),
-                focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White,
-                focusedContainerColor = Color(15, 15, 18),
-                unfocusedContainerColor = Color(15, 15, 18)
-            ),
-            textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp)
+            textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 9.sp, textAlign = TextAlign.Center),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(24.dp),
+            cursorBrush = SolidColor(Color(0, 162, 255)),
+            decorationBox = { innerTextField ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color(15, 15, 18), RoundedCornerShape(3.dp))
+                        .border(1.dp, Color(50, 50, 55), RoundedCornerShape(3.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    innerTextField()
+                }
+            }
         )
+        Spacer(modifier = Modifier.height(2.dp))
         Text(label, fontSize = 7.sp, color = Color.Gray)
     }
 }
@@ -976,4 +1014,36 @@ fun ColorSlider(label: String, value: Int, onValueChange: (Int) -> Unit, color: 
             modifier = Modifier.height(14.dp)
         )
     }
+}
+
+@Composable
+fun RobloxTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    placeholder: String = ""
+) {
+    BasicTextField(
+        value = value,
+        onValueChange = onValueChange,
+        singleLine = true,
+        textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 10.sp),
+        modifier = modifier,
+        cursorBrush = SolidColor(Color(0, 162, 255)),
+        decorationBox = { innerTextField ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(18, 18, 22), RoundedCornerShape(4.dp))
+                    .border(1.dp, Color(55, 55, 60), RoundedCornerShape(4.dp))
+                    .padding(horizontal = 8.dp),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                if (value.isEmpty()) {
+                    Text(placeholder, color = Color.Gray, fontSize = 10.sp)
+                }
+                innerTextField()
+            }
+        }
+    )
 }

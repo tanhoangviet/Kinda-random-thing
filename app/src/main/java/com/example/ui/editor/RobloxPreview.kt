@@ -197,13 +197,23 @@ fun RenderRobloxObject(
         val colorStr = gradientChild.properties["Color"] as? String ?: "255,255,255 to 150,150,150"
         val rotation = (gradientChild.properties["Rotation"] as? Float ?: 0f) % 360f
         
-        val colors = try {
-            colorStr.split(" to ").map { part ->
-                val rgb = part.split(",").map { it.trim().toInt() }
-                Color(rgb[0], rgb[1], rgb[2])
+        val colorStops = try {
+            if (colorStr.contains(";")) {
+                colorStr.split(";").map { part ->
+                    val segments = part.split(":")
+                    val pos = segments[0].toFloat()
+                    val rgb = segments[1].split(",").map { it.trim().toInt() }
+                    pos to Color(rgb[0], rgb[1], rgb[2])
+                }.toTypedArray()
+            } else {
+                val colors = colorStr.split(" to ").map { part ->
+                    val rgb = part.split(",").map { it.trim().toInt() }
+                    Color(rgb[0], rgb[1], rgb[2])
+                }
+                arrayOf(0f to colors[0], 1f to colors[1])
             }
         } catch (e: Exception) {
-            listOf(Color.White, Color.Gray)
+            arrayOf(0f to Color.White, 1f to Color.Gray)
         }
 
         // Calculate gradient start and end based on rotation
@@ -215,7 +225,7 @@ fun RenderRobloxObject(
 
         Modifier.background(
             Brush.linearGradient(
-                colors = colors,
+                colorStops = colorStops,
                 start = Offset(startX * wPx, startY * hPx),
                 end = Offset(endX * wPx, endY * hPx),
                 tileMode = TileMode.Clamp
