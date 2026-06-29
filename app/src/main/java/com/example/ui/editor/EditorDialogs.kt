@@ -426,3 +426,38 @@ fun ScriptEditorDialog(
         }
     )
 }
+
+@Composable
+fun GradientPickerDialog(
+    initialColorString: String,
+    onDismiss: () -> Unit,
+    onSave: (String) -> Unit
+) {
+    var gradientString by remember { mutableStateOf(initialColorString) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit Gradient (Color1 to Color2)", fontSize = 14.sp) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = gradientString,
+                    onValueChange = { gradientString = it },
+                    label = { Text("Gradient (e.g. 255,0,0 to 0,0,255)") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Text("Helper: Use 'R,G,B to R,G,B' format", fontSize = 10.sp, color = Color.Gray)
+            }
+        },
+        confirmButton = {
+            Button(onClick = { onSave(gradientString); onDismiss() }) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}

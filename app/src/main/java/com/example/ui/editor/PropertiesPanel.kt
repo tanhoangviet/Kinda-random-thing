@@ -67,6 +67,7 @@ fun PropertiesPanel(
 
     val scrollState = rememberScrollState()
     var activeColorProp by remember { mutableStateOf<Pair<String, Color3>?>(null) } // (propName, Color3)
+    var activeGradientProp by remember { mutableStateOf<Pair<String, String>?>(null) } // (propName, String)
 
     Column(
         modifier = modifier
@@ -261,6 +262,34 @@ fun PropertiesPanel(
         }
 
         // Appearance Group (BackgroundColor, Transparency, Border, etc.)
+        if (selectedObj.className == RobloxClass.UIGradient) {
+            PropertySection(title = "Gradient") {
+                val colorStr = selectedObj.properties["Color"] as? String ?: "255,255,255 to 150,150,150"
+                PropertyRow(label = "Color") {
+                    Button(
+                        onClick = { activeGradientProp = "Color" to colorStr },
+                        modifier = Modifier.fillMaxWidth().height(32.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0, 162, 255)),
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Text("Edit Gradient", fontSize = 10.sp)
+                    }
+                }
+                
+                if (selectedObj.properties.containsKey("Rotation")) {
+                    val rotation = selectedObj.properties["Rotation"] as? Float ?: 0f
+                    PropertyRow(label = "Rotation") {
+                        StepperInput(
+                            value = rotation.toInt(),
+                            onValueChange = { onUpdateProperty(selectedObj.id, "Rotation", it.toFloat()) },
+                            min = 0,
+                            max = 360
+                        )
+                    }
+                }
+            }
+        }
+
         PropertySection(title = "Appearance") {
             if (selectedObj.properties.containsKey("BackgroundColor3")) {
                 val bgCol = selectedObj.properties["BackgroundColor3"] as? Color3 ?: Color3(255, 255, 255)
@@ -619,6 +648,19 @@ fun PropertiesPanel(
             onColorSelect = { newCol ->
                 onUpdateProperty(selectedObj.id, propName, newCol)
                 activeColorProp = null
+            }
+        )
+    }
+
+    // Gradient Color Picker Dialog
+    if (activeGradientProp != null) {
+        val (propName, curStr) = activeGradientProp!!
+        GradientPickerDialog(
+            initialColorString = curStr,
+            onDismiss = { activeGradientProp = null },
+            onSave = { newStr ->
+                onUpdateProperty(selectedObj.id, propName, newStr)
+                activeGradientProp = null
             }
         )
     }

@@ -71,8 +71,9 @@ fun MainWorkspace(
     var showQuickMenu by remember { mutableStateOf(true) }
 
     // Scaffold with a clean dark theme
-    Scaffold(
-        modifier = modifier.fillMaxSize(),
+    Box(modifier = modifier.fillMaxSize()) {
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
         topBar = {
             if (isTopbarVisible) {
                 TopAppBar(
@@ -637,13 +638,21 @@ fun MainWorkspace(
 
     activeScriptId?.let { scriptId ->
         viewModel.findObjectById(rootObj, scriptId)?.let { scriptObj ->
-            ScriptEditorDialog(
-                obj = scriptObj,
-                onDismiss = { viewModel.closeScriptEditor() },
-                onSave = { viewModel.updateProperty(scriptId, "Source", it) }
-            )
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = Color(0xFF1E1E1E)
+            ) {
+                VSCodeEditorScreen(
+                    scriptName = scriptObj.name,
+                    className = scriptObj.className,
+                    initialSource = scriptObj.properties["Source"] as? String ?: "",
+                    onSave = { newSrc -> viewModel.updateProperty(scriptId, "Source", newSrc) },
+                    onBack = { viewModel.closeScriptEditor() }
+                )
+            }
         }
     }
+    } // Close root Box
 }
 
 // Utility: Toolbar icon button
