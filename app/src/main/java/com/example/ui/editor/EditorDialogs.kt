@@ -328,6 +328,7 @@ fun OpenProjectDialog(
 fun ExportLuauDialog(
     luauCode: String,
     rojoBundle: String = "",
+    uiScalePercent: Int = 100,
     onDismiss: () -> Unit
 ) {
     val clipboardManager = LocalClipboardManager.current
@@ -336,6 +337,7 @@ fun ExportLuauDialog(
     var selectedMode by remember { mutableStateOf(0) }
     val selectedCode = if (selectedMode == 0) luauCode else rojoBundle.ifBlank { luauCode }
     val shareTitle = if (selectedMode == 0) "Chia se ma Luau" else "Chia se Rojo bundle"
+    val codeFontSize = (9f * (uiScalePercent / 100f)).coerceIn(8f, 13f).sp
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -345,7 +347,10 @@ fun ExportLuauDialog(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Export Luau / Rojo", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                Column {
+                    Text("Export Luau / Rojo", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    Text("DPI-aware preview • UI scale $uiScalePercent%", fontSize = 10.sp, color = Color(0xFF8C929C))
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     IconButton(
                         onClick = {
@@ -403,10 +408,23 @@ fun ExportLuauDialog(
                     )
                 }
 
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(22, 24, 28), RoundedCornerShape(6.dp))
+                        .border(1.dp, Color(45, 45, 50), RoundedCornerShape(6.dp))
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(if (selectedMode == 0) "Runtime LocalScript" else "Rojo project files", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                    Text("UI $uiScalePercent%  •  ${selectedCode.lines().size} lines", color = Color(0xFF8C929C), fontSize = 10.sp)
+                }
+
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(270.dp)
+                        .heightIn(min = 240.dp, max = 330.dp)
                         .clip(RoundedCornerShape(6.dp))
                         .background(Color(15, 15, 18))
                         .border(1.dp, Color(45, 45, 50), RoundedCornerShape(6.dp))
@@ -415,7 +433,7 @@ fun ExportLuauDialog(
                     Text(
                         text = selectedCode,
                         color = Color(46, 204, 113),
-                        fontSize = 9.sp,
+                        fontSize = codeFontSize,
                         fontFamily = FontFamily.Monospace,
                         modifier = Modifier
                             .fillMaxSize()

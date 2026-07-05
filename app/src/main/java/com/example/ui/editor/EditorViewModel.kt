@@ -219,6 +219,12 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     private val _showSettingsDialog = MutableStateFlow(false)
     val showSettingsDialog: StateFlow<Boolean> = _showSettingsDialog.asStateFlow()
 
+    private val _uiScalePercent = MutableStateFlow(100)
+    val uiScalePercent: StateFlow<Int> = _uiScalePercent.asStateFlow()
+
+    private val _studioTheme = MutableStateFlow("Studio Dark")
+    val studioTheme: StateFlow<String> = _studioTheme.asStateFlow()
+
     fun setUseSingleDragMode(enabled: Boolean) {
         _useSingleDragMode.value = enabled
     }
@@ -229,6 +235,14 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
 
     fun setShowSettingsDialog(show: Boolean) {
         _showSettingsDialog.value = show
+    }
+
+    fun setUiScalePercent(percent: Int) {
+        _uiScalePercent.value = percent.coerceIn(75, 135)
+    }
+
+    fun setStudioTheme(theme: String) {
+        _studioTheme.value = theme
     }
 
     fun togglePreviewMode() {

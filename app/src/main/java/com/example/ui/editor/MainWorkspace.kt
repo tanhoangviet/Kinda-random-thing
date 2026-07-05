@@ -1,13 +1,18 @@
 package com.example.ui.editor
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -20,14 +25,19 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import com.example.R
+import com.example.data.local.ProjectEntity
 import com.example.data.model.RobloxClass
 import com.example.data.model.RobloxObject
 import kotlin.math.min
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,6 +68,11 @@ fun MainWorkspace(
     val isTopbarVisible by viewModel.isTopbarVisible.collectAsState()
     val showSettingsDialog by viewModel.showSettingsDialog.collectAsState()
     val language by viewModel.language.collectAsState()
+    val uiScalePercent by viewModel.uiScalePercent.collectAsState()
+    val studioTheme by viewModel.studioTheme.collectAsState()
+    val baseDensity = LocalDensity.current
+    val densityScale = (uiScalePercent / 100f).coerceIn(0.75f, 1.35f)
+    val themeColors = remember(studioTheme) { studioThemePalette(studioTheme) }
 
     // Dialog trigger states
     var showInsertDialog by remember { mutableStateOf(false) }
@@ -103,6 +118,12 @@ fun MainWorkspace(
     }
 
     // Scaffold with a clean dark theme
+    CompositionLocalProvider(
+        LocalDensity provides Density(
+            density = baseDensity.density * densityScale,
+            fontScale = baseDensity.fontScale
+        )
+    ) {
     Box(modifier = modifier.fillMaxSize()) {
         Scaffold(
             modifier = Modifier.fillMaxSize(),
@@ -110,33 +131,18 @@ fun MainWorkspace(
             if (isTopbarVisible) {
                 TopAppBar(
                     title = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Image(
-                                painter = painterResource(id = R.drawable.vanilla_studio),
-                                contentDescription = "Vanilla Studio",
-                                modifier = Modifier
-                                    .size(if (isCompact) 22.dp else 28.dp),
-                                contentScale = ContentScale.Fit
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Column {
-                                Text(
-                                    text = "ROBLOX STUDIO UI",
-                                    color = Color(0xFFE7EAEE),
-                                    fontSize = if (isCompact) 10.sp else 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    letterSpacing = 0.sp
-                                )
-                                if (!isCompact) {
-                                    Text(
-                                        text = "$projectName  |  $devicePreview  |  Landscape",
-                                        color = Color(0xFF8FBFF8),
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                }
-                            }
-                        }
+                        ProjectTitleMenu(
+                            projectName = projectName,
+                            devicePreview = devicePreview,
+                            isCompact = isCompact,
+                            savedProjects = savedProjects,
+                            accentColor = themeColors.accent,
+                            onNewProject = { showNewProjectDialog = true },
+                            onOpenProject = { showOpenProjectDialog = true },
+                            onSaveProject = { viewModel.saveProjectToLocal() },
+                            onExport = { openExportDialog() },
+                            onLoadProject = { viewModel.loadProject(it) }
+                        )
                     },
                     actions = {
                         ToolbarIconButton(
@@ -293,14 +299,14 @@ fun MainWorkspace(
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color(0xFF202124),
+                        containerColor = themeColors.topBar,
                         titleContentColor = Color(0xFFE7EAEE)
                     ),
                     modifier = Modifier.statusBarsPadding()
                 )
             }
         },
-        containerColor = Color(0xFF18191C)
+        containerColor = themeColors.background
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -347,8 +353,8 @@ fun MainWorkspace(
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .fillMaxHeight()
-                        .background(Color(0xFF191B1F))
+                            .fillMaxHeight()
+                        .background(themeColors.background)
                         .border(0.5.dp, Color(0xFF3D4148))
                         .pointerInput(Unit) {
                             detectTapGestures(
@@ -403,7 +409,7 @@ fun MainWorkspace(
                             )
                         }
 
-                        // Floating quick settings overlay at the top-right corner of the workspace
+                        // Floating topbar toggle. Settings moved to the macOS-style settings window.
                         Box(
                             modifier = Modifier
                                 .align(Alignment.TopEnd)
@@ -425,16 +431,6 @@ fun MainWorkspace(
                                         contentDescription = "Toggle Topbar",
                                         tint = Color.White,
                                         modifier = Modifier.size(20.dp)
-                                    )
-                                }
-                                IconButton(
-                                    onClick = { viewModel.setShowSettingsDialog(true) },
-                                    modifier = Modifier.size(44.dp)
-                                ) {
-                                    Image(
-                                        painter = painterResource(id = R.drawable.vanilla_action_settings),
-                                        contentDescription = "Open Settings",
-                                        modifier = Modifier.size(22.dp)
                                     )
                                 }
                             }
@@ -602,176 +598,32 @@ fun MainWorkspace(
         ExportLuauDialog(
             luauCode = generatedLuauCode,
             rojoBundle = generatedRojoBundle,
+            uiScalePercent = uiScalePercent,
             onDismiss = { showExportDialog = false }
         )
     }
 
     if (showSettingsDialog) {
-        AlertDialog(
-            onDismissRequest = { viewModel.setShowSettingsDialog(false) },
-            title = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.Settings,
-                        contentDescription = null,
-                        tint = Color(0, 162, 255),
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Cài Đặt Workspace",
-                        color = Color.White,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+        MacSettingsDialog(
+            useSingleDragMode = useSingleDragMode,
+            isTopbarVisible = isTopbarVisible,
+            showGrid = showGrid,
+            snapToGrid = snapToGrid,
+            gridSize = gridSize,
+            uiScalePercent = uiScalePercent,
+            studioTheme = studioTheme,
+            onUseSingleDragModeChange = { viewModel.setUseSingleDragMode(it) },
+            onTopbarVisibleChange = { viewModel.setTopbarVisible(it) },
+            onShowGridChange = { viewModel.setShowGrid(it) },
+            onSnapToGridChange = { viewModel.setSnapToGrid(it) },
+            onGridSizeChange = { viewModel.setGridSize(it) },
+            onUiScalePercentChange = { viewModel.setUiScalePercent(it) },
+            onThemeChange = { viewModel.setStudioTheme(it) },
+            onResetUi = {
+                viewModel.setUiScalePercent(100)
+                viewModel.setStudioTheme("Studio Dark")
             },
-            text = {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    // 1. Chế độ Kéo Đơn
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Chế độ Kéo Đơn (4 góc)",
-                                color = Color.White,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Text(
-                                text = "Khóa di chuyển camera khi chọn UI. Kéo 4 góc để co giãn tự do.",
-                                color = Color.Gray,
-                                fontSize = 11.sp
-                            )
-                        }
-                        Switch(
-                            checked = useSingleDragMode,
-                            onCheckedChange = { viewModel.setUseSingleDragMode(it) },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = Color(0, 162, 255)
-                            )
-                        )
-                    }
-
-                    HorizontalDivider(color = Color.Gray.copy(alpha = 0.2f))
-
-                    // 2. Hiện Topbar
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Hiển thị thanh công cụ (Topbar)",
-                                color = Color.White,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Text(
-                                text = "Ẩn đi để tăng không gian thiết kế.",
-                                color = Color.Gray,
-                                fontSize = 11.sp
-                            )
-                        }
-                        Switch(
-                            checked = isTopbarVisible,
-                            onCheckedChange = { viewModel.setTopbarVisible(it) },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = Color(0, 162, 255)
-                            )
-                        )
-                    }
-
-                    HorizontalDivider(color = Color.Gray.copy(alpha = 0.2f))
-
-                    // 3. Grid Settings
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Căn theo lưới (Snap to Grid)",
-                                color = Color.White,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Text(
-                                text = "Tự động gắn tọa độ khi di chuyển/co giãn.",
-                                color = Color.Gray,
-                                fontSize = 11.sp
-                            )
-                        }
-                        Switch(
-                            checked = snapToGrid,
-                            onCheckedChange = { viewModel.setSnapToGrid(it) },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = Color(0, 162, 255)
-                            )
-                        )
-                    }
-
-                    if (snapToGrid) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Kích thước Lưới (pixels)",
-                                color = Color.LightGray,
-                                fontSize = 13.sp
-                            )
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Button(
-                                    onClick = { viewModel.setGridSize((gridSize - 4).coerceAtLeast(4)) },
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color(40, 40, 45)),
-                                    contentPadding = PaddingValues(0.dp),
-                                    modifier = Modifier.size(28.dp)
-                                ) {
-                                    Text("-", color = Color.White)
-                                }
-                                Text(
-                                    text = "$gridSize px",
-                                    color = Color.White,
-                                    fontSize = 13.sp,
-                                    modifier = Modifier.padding(horizontal = 8.dp)
-                                )
-                                Button(
-                                    onClick = { viewModel.setGridSize((gridSize + 4).coerceAtMost(64)) },
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color(40, 40, 45)),
-                                    contentPadding = PaddingValues(0.dp),
-                                    modifier = Modifier.size(28.dp)
-                                ) {
-                                    Text("+", color = Color.White)
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = { viewModel.setShowSettingsDialog(false) },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0, 162, 255))
-                ) {
-                    Text("Hoàn tất", color = Color.White)
-                }
-            },
-            containerColor = Color(24, 24, 28),
-            titleContentColor = Color.White,
-            textContentColor = Color.LightGray
+            onDismiss = { viewModel.setShowSettingsDialog(false) }
         )
     }
 
@@ -792,6 +644,394 @@ fun MainWorkspace(
         }
     }
     } // Close root Box
+    }
+}
+
+private data class StudioThemeColors(
+    val name: String,
+    val topBar: Color,
+    val background: Color,
+    val panel: Color,
+    val accent: Color
+)
+
+private fun studioThemePalette(theme: String): StudioThemeColors {
+    return when (theme) {
+        "Midnight" -> StudioThemeColors(theme, Color(0xFF111827), Color(0xFF0B1020), Color(0xFF151B2D), Color(0xFF7DD3FC))
+        "Graphite" -> StudioThemeColors(theme, Color(0xFF242424), Color(0xFF181818), Color(0xFF2B2B2B), Color(0xFFB7C0CC))
+        "Vanilla Blue" -> StudioThemeColors(theme, Color(0xFF172233), Color(0xFF111820), Color(0xFF202A36), Color(0xFF38BDF8))
+        else -> StudioThemeColors("Studio Dark", Color(0xFF202124), Color(0xFF18191C), Color(0xFF25272C), Color(0xFF8FBFF8))
+    }
+}
+
+@Composable
+private fun ProjectTitleMenu(
+    projectName: String,
+    devicePreview: String,
+    isCompact: Boolean,
+    savedProjects: List<ProjectEntity>,
+    accentColor: Color,
+    onNewProject: () -> Unit,
+    onOpenProject: () -> Unit,
+    onSaveProject: () -> Unit,
+    onExport: () -> Unit,
+    onLoadProject: (ProjectEntity) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        Row(
+            modifier = Modifier
+                .clickable { expanded = true }
+                .padding(end = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.vanilla_studio),
+                contentDescription = "Vanilla Studio",
+                modifier = Modifier.size(if (isCompact) 22.dp else 28.dp),
+                contentScale = ContentScale.Fit
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Column {
+                Text(
+                    text = "ROBLOX STUDIO UI",
+                    color = Color(0xFFE7EAEE),
+                    fontSize = if (isCompact) 10.sp else 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.sp
+                )
+                if (!isCompact) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = projectName,
+                            color = accentColor,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = "  |  $devicePreview  |  Landscape",
+                            color = Color(0xFFA6ACB3),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.width(4.dp))
+            Icon(Icons.Default.ArrowDropDown, contentDescription = "Project menu", tint = Color(0xFFA6ACB3), modifier = Modifier.size(18.dp))
+        }
+
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            DropdownMenuItem(
+                leadingIcon = { Image(painterResource(R.drawable.vanilla_action_new), null, Modifier.size(18.dp)) },
+                text = { Text("Tạo project mới") },
+                onClick = {
+                    expanded = false
+                    onNewProject()
+                }
+            )
+            DropdownMenuItem(
+                leadingIcon = { Image(painterResource(R.drawable.vanilla_action_open), null, Modifier.size(18.dp)) },
+                text = { Text("Mở project manager") },
+                onClick = {
+                    expanded = false
+                    onOpenProject()
+                }
+            )
+            DropdownMenuItem(
+                leadingIcon = { Image(painterResource(R.drawable.vanilla_action_save), null, Modifier.size(18.dp)) },
+                text = { Text("Lưu project hiện tại") },
+                onClick = {
+                    expanded = false
+                    onSaveProject()
+                }
+            )
+            DropdownMenuItem(
+                leadingIcon = { Image(painterResource(R.drawable.vanilla_action_code), null, Modifier.size(18.dp)) },
+                text = { Text("Export Luau / Rojo") },
+                onClick = {
+                    expanded = false
+                    onExport()
+                }
+            )
+            if (savedProjects.isNotEmpty()) {
+                HorizontalDivider()
+                Text(
+                    text = "RECENT PROJECTS",
+                    color = Color(0xFF8C929C),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+                savedProjects.take(6).forEach { project ->
+                    DropdownMenuItem(
+                        text = {
+                            Column {
+                                Text(project.name, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                Text(project.description, fontSize = 10.sp, color = Color(0xFF8C929C), maxLines = 1)
+                            }
+                        },
+                        onClick = {
+                            expanded = false
+                            onLoadProject(project)
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MacSettingsDialog(
+    useSingleDragMode: Boolean,
+    isTopbarVisible: Boolean,
+    showGrid: Boolean,
+    snapToGrid: Boolean,
+    gridSize: Int,
+    uiScalePercent: Int,
+    studioTheme: String,
+    onUseSingleDragModeChange: (Boolean) -> Unit,
+    onTopbarVisibleChange: (Boolean) -> Unit,
+    onShowGridChange: (Boolean) -> Unit,
+    onSnapToGridChange: (Boolean) -> Unit,
+    onGridSizeChange: (Int) -> Unit,
+    onUiScalePercentChange: (Int) -> Unit,
+    onThemeChange: (String) -> Unit,
+    onResetUi: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    var section by remember { mutableStateOf("General") }
+    val accent = studioThemePalette(studioTheme).accent
+    val contentScroll = rememberScrollState()
+    val themeScroll = rememberScrollState()
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.96f)
+                .fillMaxHeight(0.92f)
+                .widthIn(max = 760.dp),
+            color = Color(0xFF202124),
+            shape = RoundedCornerShape(12.dp),
+            border = BorderStroke(1.dp, Color(0xFF3D4148))
+        ) {
+            Column {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .background(Color(0xFF2B2D33))
+                        .padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    MacTrafficDot(Color(0xFFFF5F57))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    MacTrafficDot(Color(0xFFFFBD2E))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    MacTrafficDot(Color(0xFF28C840))
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Text("Settings", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Spacer(modifier = Modifier.weight(1f))
+                    Text("UI $uiScalePercent%", color = accent, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                }
+
+                Row(modifier = Modifier.fillMaxSize()) {
+                    Column(
+                        modifier = Modifier
+                            .width(164.dp)
+                            .fillMaxHeight()
+                            .background(Color(0xFF25272C))
+                            .padding(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        listOf("General", "Theme", "DPI", "Grid").forEach { item ->
+                            MacSettingsSidebarItem(
+                                label = item,
+                                selected = section == item,
+                                accent = accent,
+                                onClick = { section = item }
+                            )
+                        }
+                        Spacer(modifier = Modifier.weight(1f))
+                        OutlinedButton(
+                            onClick = onResetUi,
+                            modifier = Modifier.fillMaxWidth().height(40.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp)
+                        ) {
+                            Text("Reset UI", fontSize = 11.sp)
+                        }
+                    }
+
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .verticalScroll(contentScroll)
+                            .padding(18.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        Text(section, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                        when (section) {
+                            "Theme" -> {
+                                Text("Chọn theme editor", color = Color(0xFFA6ACB3), fontSize = 12.sp)
+                                Row(
+                                    modifier = Modifier.horizontalScroll(themeScroll),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    listOf("Studio Dark", "Midnight", "Graphite", "Vanilla Blue").forEach { theme ->
+                                        ThemeChoiceChip(
+                                            label = theme,
+                                            selected = studioTheme == theme,
+                                            color = studioThemePalette(theme).accent,
+                                            onClick = { onThemeChange(theme) }
+                                        )
+                                    }
+                                }
+                            }
+                            "DPI" -> {
+                                SettingsInfoRow("UI scale", "Chỉnh % giao diện cho từng máy, tablet hoặc phone landscape.")
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Slider(
+                                        value = uiScalePercent.toFloat(),
+                                        onValueChange = { raw ->
+                                            onUiScalePercentChange((raw / 5f).roundToInt() * 5)
+                                        },
+                                        valueRange = 75f..135f,
+                                        steps = 11,
+                                        modifier = Modifier.weight(1f),
+                                        colors = SliderDefaults.colors(thumbColor = accent, activeTrackColor = accent)
+                                    )
+                                    Text("$uiScalePercent%", color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.width(64.dp))
+                                }
+                            }
+                            "Grid" -> {
+                                MacSettingsToggle("Show grid", "Hiện lưới trong viewport.", showGrid, onShowGridChange)
+                                MacSettingsToggle("Snap to grid", "Gắn position/size theo grid khi kéo.", snapToGrid, onSnapToGridChange)
+                                SettingsInfoRow("Grid size", "$gridSize px")
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    OutlinedButton(onClick = { onGridSizeChange((gridSize - 4).coerceAtLeast(4)) }) { Text("-") }
+                                    Slider(
+                                        value = gridSize.toFloat(),
+                                        onValueChange = { onGridSizeChange((it / 4f).roundToInt() * 4) },
+                                        valueRange = 4f..64f,
+                                        steps = 14,
+                                        modifier = Modifier.weight(1f),
+                                        colors = SliderDefaults.colors(thumbColor = accent, activeTrackColor = accent)
+                                    )
+                                    OutlinedButton(onClick = { onGridSizeChange((gridSize + 4).coerceAtMost(64)) }) { Text("+") }
+                                }
+                            }
+                            else -> {
+                                MacSettingsToggle("Single drag mode", "Khóa camera khi chọn object, kéo góc để resize.", useSingleDragMode, onUseSingleDragModeChange)
+                                MacSettingsToggle("Show topbar", "Ẩn/hiện topbar để lấy thêm không gian edit.", isTopbarVisible, onTopbarVisibleChange)
+                                SettingsInfoRow("Floating settings removed", "Settings đã chuyển về topbar/menu để viewport sạch hơn.")
+                            }
+                        }
+                        Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+                            Button(
+                                onClick = onDismiss,
+                                colors = ButtonDefaults.buttonColors(containerColor = accent, contentColor = Color.White)
+                            ) {
+                                Text("Done")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MacTrafficDot(color: Color) {
+    Box(
+        modifier = Modifier
+            .size(12.dp)
+            .background(color, CircleShape)
+    )
+}
+
+@Composable
+private fun MacSettingsSidebarItem(
+    label: String,
+    selected: Boolean,
+    accent: Color,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(40.dp)
+            .background(if (selected) accent.copy(alpha = 0.18f) else Color.Transparent, RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, color = if (selected) Color.White else Color(0xFFA6ACB3), fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium)
+    }
+}
+
+@Composable
+private fun MacSettingsToggle(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFF2B2D33), RoundedCornerShape(8.dp))
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+            Text(subtitle, color = Color(0xFFA6ACB3), fontSize = 11.sp)
+        }
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
+    }
+}
+
+@Composable
+private fun SettingsInfoRow(title: String, value: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFF2B2D33), RoundedCornerShape(8.dp))
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(title, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, modifier = Modifier.weight(1f))
+        Text(value, color = Color(0xFFA6ACB3), fontSize = 12.sp)
+    }
+}
+
+@Composable
+private fun ThemeChoiceChip(
+    label: String,
+    selected: Boolean,
+    color: Color,
+    onClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .width(104.dp)
+            .background(if (selected) color.copy(alpha = 0.2f) else Color(0xFF2B2D33), RoundedCornerShape(10.dp))
+            .border(1.dp, if (selected) color else Color(0xFF3D4148), RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick)
+            .padding(10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .size(34.dp)
+                .background(color, RoundedCornerShape(8.dp))
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(label, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+    }
 }
 
 @Composable
