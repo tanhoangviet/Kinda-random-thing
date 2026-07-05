@@ -219,7 +219,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     private val _showSettingsDialog = MutableStateFlow(false)
     val showSettingsDialog: StateFlow<Boolean> = _showSettingsDialog.asStateFlow()
 
-    private val _uiScalePercent = MutableStateFlow(100)
+    private val _uiScalePercent = MutableStateFlow(40)
     val uiScalePercent: StateFlow<Int> = _uiScalePercent.asStateFlow()
 
     private val _studioTheme = MutableStateFlow("Studio Dark")
@@ -238,7 +238,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun setUiScalePercent(percent: Int) {
-        _uiScalePercent.value = percent.coerceIn(75, 135)
+        _uiScalePercent.value = percent.coerceIn(40, 140)
     }
 
     fun setStudioTheme(theme: String) {

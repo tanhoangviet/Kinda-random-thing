@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.SolidColor
 import android.content.Intent
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FolderOpen
@@ -32,6 +33,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import com.example.data.model.RobloxObject
 import com.example.data.model.RobloxClass
 import androidx.compose.ui.text.font.FontFamily
@@ -52,6 +54,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.window.Dialog
 import com.example.data.model.Color3
 import kotlin.math.roundToInt
 
@@ -328,172 +331,210 @@ fun OpenProjectDialog(
 fun ExportLuauDialog(
     luauCode: String,
     rojoBundle: String = "",
-    uiScalePercent: Int = 100,
+    uiScalePercent: Int = 40,
     onDismiss: () -> Unit
 ) {
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
-    val scrollState = rememberScrollState()
+    val verticalScrollState = rememberScrollState()
+    val horizontalScrollState = rememberScrollState()
     var selectedMode by remember { mutableStateOf(0) }
     val selectedCode = if (selectedMode == 0) luauCode else rojoBundle.ifBlank { luauCode }
     val shareTitle = if (selectedMode == 0) "Chia se ma Luau" else "Chia se Rojo bundle"
     val codeFontSize = (9f * (uiScalePercent / 100f)).coerceIn(8f, 13f).sp
+    val accent = if (selectedMode == 0) Color(0xFF0A84FF) else Color(0xFF28C840)
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text("Export Luau / Rojo", fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                    Text("DPI-aware preview • UI scale $uiScalePercent%", fontSize = 10.sp, color = Color(0xFF8C929C))
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    IconButton(
-                        onClick = {
-                            val sendIntent = Intent().apply {
-                                action = Intent.ACTION_SEND
-                                putExtra(Intent.EXTRA_TEXT, selectedCode)
-                                type = "text/plain"
-                            }
-                            val shareIntent = Intent.createChooser(sendIntent, shareTitle)
-                            context.startActivity(shareIntent)
-                        },
-                        modifier = Modifier.size(32.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Share,
-                            contentDescription = "Share",
-                            tint = Color(46, 204, 113)
-                        )
-                    }
-                    IconButton(
-                        onClick = { clipboardManager.setText(AnnotatedString(selectedCode)) },
-                        modifier = Modifier.size(32.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.ContentCopy,
-                            contentDescription = "Copy to clipboard",
-                            tint = Color(0, 162, 255)
-                        )
-                    }
-                }
-            }
-        },
-        text = {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
+    fun shareSelectedCode() {
+        val sendIntent = Intent().apply {
+            action = Intent.ACTION_SEND
+            putExtra(Intent.EXTRA_TEXT, selectedCode)
+            type = "text/plain"
+        }
+        val shareIntent = Intent.createChooser(sendIntent, shareTitle)
+        context.startActivity(shareIntent)
+    }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.96f)
+                .fillMaxHeight(0.9f)
+                .widthIn(max = 900.dp),
+            color = Color(0xFF1C1E24),
+            shape = RoundedCornerShape(12.dp),
+            border = BorderStroke(1.dp, Color(0xFF3A3F4A))
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color(32, 34, 38), RoundedCornerShape(4.dp))
-                        .padding(3.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    ExportModeButton(
-                        text = "Luau",
-                        selected = selectedMode == 0,
-                        onClick = { selectedMode = 0 },
-                        modifier = Modifier.weight(1f)
-                    )
-                    ExportModeButton(
-                        text = "Rojo",
-                        selected = selectedMode == 1,
-                        onClick = { selectedMode = 1 },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color(22, 24, 28), RoundedCornerShape(6.dp))
-                        .border(1.dp, Color(45, 45, 50), RoundedCornerShape(6.dp))
-                        .padding(horizontal = 10.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                        .height(52.dp)
+                        .background(Color(0xFF262A32))
+                        .padding(horizontal = 16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(if (selectedMode == 0) "Runtime LocalScript" else "Rojo project files", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                    Text("UI $uiScalePercent%  •  ${selectedCode.lines().size} lines", color = Color(0xFF8C929C), fontSize = 10.sp)
+                    ExportTrafficDot(Color(0xFFFF5F57))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    ExportTrafficDot(Color(0xFFFFBD2E))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    ExportTrafficDot(Color(0xFF28C840))
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Export GUI", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            "DPI-aware • UI $uiScalePercent% • ${selectedCode.lines().size} lines",
+                            color = Color(0xFFA6ACB3),
+                            fontSize = 10.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    IconButton(onClick = { selectedMode = 0 }, modifier = Modifier.size(48.dp)) {
+                        Icon(Icons.Default.Add, contentDescription = "New Luau tab", tint = Color(0xFFE7EAEE))
+                    }
+                    IconButton(onClick = { clipboardManager.setText(AnnotatedString(selectedCode)) }, modifier = Modifier.size(48.dp)) {
+                        Icon(Icons.Default.ContentCopy, contentDescription = "Copy", tint = Color(0xFFE7EAEE))
+                    }
+                    IconButton(onClick = { shareSelectedCode() }, modifier = Modifier.size(48.dp)) {
+                        Icon(Icons.Default.Share, contentDescription = "Share", tint = Color(0xFFE7EAEE))
+                    }
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(48.dp)) {
+                        Icon(Icons.Default.Close, contentDescription = "Close", tint = Color(0xFFE7EAEE))
+                    }
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(44.dp)
+                        .background(Color(0xFF20232A))
+                        .padding(horizontal = 12.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    ExportTabButton(
+                        label = "Luau",
+                        selected = selectedMode == 0,
+                        accent = Color(0xFF0A84FF),
+                        modifier = Modifier.weight(1f),
+                        onClick = { selectedMode = 0 }
+                    )
+                    ExportTabButton(
+                        label = "Rojo",
+                        selected = selectedMode == 1,
+                        accent = Color(0xFF28C840),
+                        modifier = Modifier.weight(1f),
+                        onClick = { selectedMode = 1 }
+                    )
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFF181A20))
+                        .border(0.5.dp, Color(0xFF343842))
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        if (selectedMode == 0) "Runtime LocalScript" else "Rojo project files",
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text("Tab ${selectedMode + 1}/2", color = accent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
 
                 Box(
                     modifier = Modifier
+                        .weight(1f)
                         .fillMaxWidth()
-                        .heightIn(min = 240.dp, max = 330.dp)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(Color(15, 15, 18))
-                        .border(1.dp, Color(45, 45, 50), RoundedCornerShape(6.dp))
-                        .padding(8.dp)
+                        .background(Color(0xFF0F1117))
+                        .padding(12.dp)
                 ) {
                     Text(
                         text = selectedCode,
-                        color = Color(46, 204, 113),
+                        color = if (selectedMode == 0) Color(0xFF7CFFB2) else Color(0xFF9AD0FF),
                         fontSize = codeFontSize,
                         fontFamily = FontFamily.Monospace,
                         modifier = Modifier
                             .fillMaxSize()
-                            .verticalScroll(scrollState)
+                            .horizontalScroll(horizontalScrollState)
+                            .verticalScroll(verticalScrollState)
                     )
                 }
-            }
-        },
-        confirmButton = {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
-                    onClick = {
-                        val sendIntent = Intent().apply {
-                            action = Intent.ACTION_SEND
-                            putExtra(Intent.EXTRA_TEXT, selectedCode)
-                            type = "text/plain"
-                        }
-                        val shareIntent = Intent.createChooser(sendIntent, shareTitle)
-                        context.startActivity(shareIntent)
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(46, 204, 113))
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                        .background(Color(0xFF20232A))
+                        .padding(horizontal = 12.dp),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.White)
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Chia sẻ", color = Color.White)
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        border = BorderStroke(1.dp, Color(0xFF4B5260))
+                    ) {
+                        Text("Close")
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = { shareSelectedCode() },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF28C840), contentColor = Color.White)
+                    ) {
+                        Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Share")
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = { clipboardManager.setText(AnnotatedString(selectedCode)) },
+                        colors = ButtonDefaults.buttonColors(containerColor = accent, contentColor = Color.White)
+                    ) {
+                        Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Copy")
+                    }
                 }
-                Button(
-                    onClick = { clipboardManager.setText(AnnotatedString(selectedCode)) },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0, 162, 255))
-                ) {
-                    Text("Copy & Close", color = Color.White)
-                }
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
             }
         }
+    }
+}
+
+@Composable
+private fun ExportTrafficDot(color: Color) {
+    Box(
+        modifier = Modifier
+            .size(12.dp)
+            .background(color, CircleShape)
     )
 }
 
 @Composable
-private fun ExportModeButton(
-    text: String,
+private fun ExportTabButton(
+    label: String,
     selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    accent: Color,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
 ) {
-    Button(
+    Surface(
         onClick = onClick,
-        modifier = modifier.height(32.dp),
-        contentPadding = PaddingValues(horizontal = 8.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = if (selected) Color(0, 162, 255) else Color.Transparent,
-            contentColor = if (selected) Color.White else Color(190, 196, 204)
-        ),
-        elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp, pressedElevation = 0.dp)
+        modifier = modifier.fillMaxHeight(),
+        color = if (selected) accent.copy(alpha = 0.22f) else Color(0xFF2A2E37),
+        contentColor = if (selected) Color.White else Color(0xFFA6ACB3),
+        shape = RoundedCornerShape(8.dp),
+        border = BorderStroke(1.dp, if (selected) accent else Color(0xFF343842))
     ) {
-        Text(text = text, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+        Row(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Text(label, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        }
     }
 }
 

@@ -71,7 +71,7 @@ fun MainWorkspace(
     val uiScalePercent by viewModel.uiScalePercent.collectAsState()
     val studioTheme by viewModel.studioTheme.collectAsState()
     val baseDensity = LocalDensity.current
-    val densityScale = (uiScalePercent / 100f).coerceIn(0.75f, 1.35f)
+    val densityScale = (uiScalePercent / 100f).coerceIn(0.4f, 1.4f)
     val themeColors = remember(studioTheme) { studioThemePalette(studioTheme) }
 
     // Dialog trigger states
@@ -89,14 +89,15 @@ fun MainWorkspace(
     val explorerPanelWidth = if (isCompact) 216.dp else 248.dp
     val propertiesPanelWidth = if (isCompact) 256.dp else 304.dp
     val collapsedRailWidth = 52.dp
-    val sidePanelReserve = if (!isPreviewMode) {
+    val logicalSidePanelReserve = if (!isPreviewMode) {
         (if (explorerMinimized) 52 else if (isCompact) 216 else 248) +
             (if (propertiesMinimized) 52 else if (isCompact) 256 else 304)
     } else {
         0
     }
-    val bottomReserve = 28
-    val topReserve = if (isTopbarVisible) 72 else 8
+    val sidePanelReserve = (logicalSidePanelReserve * densityScale).roundToInt()
+    val bottomReserve = (28 * densityScale).roundToInt()
+    val topReserve = ((if (isTopbarVisible) 56 else 8) * densityScale).roundToInt()
     val fitCanvasScale = min(
         ((configuration.screenWidthDp - sidePanelReserve).coerceAtLeast(320)).toFloat() / screenWidth.coerceAtLeast(1).toFloat(),
         ((configuration.screenHeightDp - topReserve - bottomReserve).coerceAtLeast(240)).toFloat() / screenHeight.coerceAtLeast(1).toFloat()
@@ -129,180 +130,26 @@ fun MainWorkspace(
             modifier = Modifier.fillMaxSize(),
         topBar = {
             if (isTopbarVisible) {
-                TopAppBar(
-                    title = {
-                        ProjectTitleMenu(
-                            projectName = projectName,
-                            devicePreview = devicePreview,
-                            isCompact = isCompact,
-                            savedProjects = savedProjects,
-                            accentColor = themeColors.accent,
-                            onNewProject = { showNewProjectDialog = true },
-                            onOpenProject = { showOpenProjectDialog = true },
-                            onSaveProject = { viewModel.saveProjectToLocal() },
-                            onExport = { openExportDialog() },
-                            onLoadProject = { viewModel.loadProject(it) }
-                        )
-                    },
-                    actions = {
-                        ToolbarIconButton(
-                            iconRes = R.drawable.vanilla_action_new,
-                            text = "New",
-                            onClick = { showNewProjectDialog = true }
-                        )
-                        ToolbarIconButton(
-                            iconRes = R.drawable.vanilla_action_save,
-                            text = "Save",
-                            onClick = { viewModel.saveProjectToLocal() }
-                        )
-
-                        if (!isCompact) {
-                            ToolbarIconButton(
-                                iconRes = R.drawable.vanilla_action_open,
-                                text = "Open",
-                                onClick = { showOpenProjectDialog = true }
-                            )
-                            ToolbarIconButton(
-                                iconRes = R.drawable.vanilla_action_code,
-                                text = "Export",
-                                onClick = { openExportDialog() }
-                            )
-
-                            StudioToolbarDivider()
-
-                            ToolbarIconButton(
-                                iconRes = R.drawable.vanilla_action_undo,
-                                text = "Undo",
-                                onClick = { viewModel.undo() }
-                            )
-                            ToolbarIconButton(
-                                iconRes = R.drawable.vanilla_action_redo,
-                                text = "Redo",
-                                onClick = { viewModel.redo() }
-                            )
-
-                            StudioToolbarDivider()
-
-                            ToolbarIconToggle(
-                                iconRes = R.drawable.vanilla_action_grid,
-                                checked = showGrid,
-                                text = "Grid",
-                                onCheckedChange = { viewModel.setShowGrid(it) }
-                            )
-                            ToolbarIconButton(
-                                iconRes = R.drawable.vanilla_action_settings,
-                                text = "Settings",
-                                onClick = { viewModel.setShowSettingsDialog(true) }
-                            )
-                        } else {
-                            Box {
-                                ToolbarIconButton(
-                                    icon = Icons.Default.MoreVert,
-                                    text = "More",
-                                    onClick = { showCompactMenu = true }
-                                )
-                                DropdownMenu(
-                                    expanded = showCompactMenu,
-                                    onDismissRequest = { showCompactMenu = false }
-                                ) {
-                                    DropdownMenuItem(
-                                        leadingIcon = {
-                                            Image(painterResource(R.drawable.vanilla_action_open), null, Modifier.size(20.dp))
-                                        },
-                                        text = { Text("Open") },
-                                        onClick = {
-                                            showOpenProjectDialog = true
-                                            showCompactMenu = false
-                                        }
-                                    )
-                                    DropdownMenuItem(
-                                        leadingIcon = {
-                                            Image(painterResource(R.drawable.vanilla_action_code), null, Modifier.size(20.dp))
-                                        },
-                                        text = { Text("Export Luau") },
-                                        onClick = {
-                                            openExportDialog()
-                                            showCompactMenu = false
-                                        }
-                                    )
-                                    HorizontalDivider()
-                                    DropdownMenuItem(
-                                        leadingIcon = {
-                                            Image(painterResource(R.drawable.vanilla_action_undo), null, Modifier.size(20.dp))
-                                        },
-                                        text = { Text("Undo") },
-                                        onClick = {
-                                            viewModel.undo()
-                                            showCompactMenu = false
-                                        }
-                                    )
-                                    DropdownMenuItem(
-                                        leadingIcon = {
-                                            Image(painterResource(R.drawable.vanilla_action_redo), null, Modifier.size(20.dp))
-                                        },
-                                        text = { Text("Redo") },
-                                        onClick = {
-                                            viewModel.redo()
-                                            showCompactMenu = false
-                                        }
-                                    )
-                                    DropdownMenuItem(
-                                        leadingIcon = {
-                                            Image(painterResource(R.drawable.vanilla_action_grid), null, Modifier.size(20.dp))
-                                        },
-                                        text = { Text(if (showGrid) "Hide Grid" else "Show Grid") },
-                                        onClick = {
-                                            viewModel.setShowGrid(!showGrid)
-                                            showCompactMenu = false
-                                        }
-                                    )
-                                    DropdownMenuItem(
-                                        leadingIcon = {
-                                            Image(painterResource(R.drawable.vanilla_action_settings), null, Modifier.size(20.dp))
-                                        },
-                                        text = { Text("Settings") },
-                                        onClick = {
-                                            viewModel.setShowSettingsDialog(true)
-                                            showCompactMenu = false
-                                        }
-                                    )
-                                }
-                            }
-                        }
-
-                        FilledTonalButton(
-                            onClick = { viewModel.togglePreviewMode() },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (isPreviewMode) Color(0xFF1F7A4D) else Color(0xFF32353B),
-                                contentColor = Color.White
-                            ),
-                            contentPadding = PaddingValues(horizontal = if (isCompact) 8.dp else 12.dp, vertical = 0.dp),
-                            modifier = Modifier
-                                .padding(horizontal = 4.dp)
-                                .height(40.dp)
-                        ) {
-                            Icon(
-                                imageVector = if (isPreviewMode) Icons.Default.Visibility else Icons.Default.Edit,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp),
-                                tint = Color.White
-                            )
-                            if (!isCompact) {
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = if (isPreviewMode) "Preview" else "Edit",
-                                    fontSize = 12.sp,
-                                    color = Color.White,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = themeColors.topBar,
-                        titleContentColor = Color(0xFFE7EAEE)
-                    ),
-                    modifier = Modifier.statusBarsPadding()
+                StudioTopBar(
+                    projectName = projectName,
+                    devicePreview = devicePreview,
+                    isCompact = isCompact,
+                    savedProjects = savedProjects,
+                    showGrid = showGrid,
+                    isPreviewMode = isPreviewMode,
+                    showCompactMenu = showCompactMenu,
+                    themeColors = themeColors,
+                    onCompactMenuChange = { showCompactMenu = it },
+                    onNewProject = { showNewProjectDialog = true },
+                    onSaveProject = { viewModel.saveProjectToLocal() },
+                    onOpenProject = { showOpenProjectDialog = true },
+                    onExport = { openExportDialog() },
+                    onUndo = { viewModel.undo() },
+                    onRedo = { viewModel.redo() },
+                    onToggleGrid = { viewModel.setShowGrid(!showGrid) },
+                    onSettings = { viewModel.setShowSettingsDialog(true) },
+                    onTogglePreview = { viewModel.togglePreviewMode() },
+                    onLoadProject = { viewModel.loadProject(it) }
                 )
             }
         },
@@ -312,7 +159,6 @@ fun MainWorkspace(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .then(if (!isTopbarVisible) Modifier.statusBarsPadding() else Modifier)
         ) {
             // Main Content Area
             Row(
@@ -620,7 +466,7 @@ fun MainWorkspace(
             onUiScalePercentChange = { viewModel.setUiScalePercent(it) },
             onThemeChange = { viewModel.setStudioTheme(it) },
             onResetUi = {
-                viewModel.setUiScalePercent(100)
+                viewModel.setUiScalePercent(40)
                 viewModel.setStudioTheme("Studio Dark")
             },
             onDismiss = { viewModel.setShowSettingsDialog(false) }
@@ -661,6 +507,210 @@ private fun studioThemePalette(theme: String): StudioThemeColors {
         "Graphite" -> StudioThemeColors(theme, Color(0xFF242424), Color(0xFF181818), Color(0xFF2B2B2B), Color(0xFFB7C0CC))
         "Vanilla Blue" -> StudioThemeColors(theme, Color(0xFF172233), Color(0xFF111820), Color(0xFF202A36), Color(0xFF38BDF8))
         else -> StudioThemeColors("Studio Dark", Color(0xFF202124), Color(0xFF18191C), Color(0xFF25272C), Color(0xFF8FBFF8))
+    }
+}
+
+@Composable
+private fun StudioTopBar(
+    projectName: String,
+    devicePreview: String,
+    isCompact: Boolean,
+    savedProjects: List<ProjectEntity>,
+    showGrid: Boolean,
+    isPreviewMode: Boolean,
+    showCompactMenu: Boolean,
+    themeColors: StudioThemeColors,
+    onCompactMenuChange: (Boolean) -> Unit,
+    onNewProject: () -> Unit,
+    onSaveProject: () -> Unit,
+    onOpenProject: () -> Unit,
+    onExport: () -> Unit,
+    onUndo: () -> Unit,
+    onRedo: () -> Unit,
+    onToggleGrid: () -> Unit,
+    onSettings: () -> Unit,
+    onTogglePreview: () -> Unit,
+    onLoadProject: (ProjectEntity) -> Unit
+) {
+    Surface(
+        color = themeColors.topBar,
+        border = BorderStroke(0.5.dp, Color(0xFF343842))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(if (isCompact) 52.dp else 56.dp)
+                .padding(horizontal = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(modifier = Modifier.weight(1f)) {
+                ProjectTitleMenu(
+                    projectName = projectName,
+                    devicePreview = devicePreview,
+                    isCompact = isCompact,
+                    savedProjects = savedProjects,
+                    accentColor = themeColors.accent,
+                    onNewProject = onNewProject,
+                    onOpenProject = onOpenProject,
+                    onSaveProject = onSaveProject,
+                    onExport = onExport,
+                    onLoadProject = onLoadProject
+                )
+            }
+
+            ToolbarIconButton(
+                iconRes = R.drawable.vanilla_action_new,
+                text = "New",
+                onClick = onNewProject
+            )
+            ToolbarIconButton(
+                iconRes = R.drawable.vanilla_action_save,
+                text = "Save",
+                onClick = onSaveProject
+            )
+
+            if (!isCompact) {
+                ToolbarIconButton(
+                    iconRes = R.drawable.vanilla_action_open,
+                    text = "Open",
+                    onClick = onOpenProject
+                )
+                ToolbarIconButton(
+                    iconRes = R.drawable.vanilla_action_code,
+                    text = "Export",
+                    onClick = onExport
+                )
+
+                StudioToolbarDivider()
+
+                ToolbarIconButton(
+                    iconRes = R.drawable.vanilla_action_undo,
+                    text = "Undo",
+                    onClick = onUndo
+                )
+                ToolbarIconButton(
+                    iconRes = R.drawable.vanilla_action_redo,
+                    text = "Redo",
+                    onClick = onRedo
+                )
+
+                StudioToolbarDivider()
+
+                ToolbarIconToggle(
+                    iconRes = R.drawable.vanilla_action_grid,
+                    checked = showGrid,
+                    text = "Grid",
+                    onCheckedChange = { onToggleGrid() }
+                )
+                ToolbarIconButton(
+                    iconRes = R.drawable.vanilla_action_settings,
+                    text = "Settings",
+                    onClick = onSettings
+                )
+            } else {
+                Box {
+                    ToolbarIconButton(
+                        icon = Icons.Default.MoreVert,
+                        text = "More",
+                        onClick = { onCompactMenuChange(true) }
+                    )
+                    DropdownMenu(
+                        expanded = showCompactMenu,
+                        onDismissRequest = { onCompactMenuChange(false) }
+                    ) {
+                        DropdownMenuItem(
+                            leadingIcon = {
+                                Image(painterResource(R.drawable.vanilla_action_open), null, Modifier.size(20.dp))
+                            },
+                            text = { Text("Open") },
+                            onClick = {
+                                onOpenProject()
+                                onCompactMenuChange(false)
+                            }
+                        )
+                        DropdownMenuItem(
+                            leadingIcon = {
+                                Image(painterResource(R.drawable.vanilla_action_code), null, Modifier.size(20.dp))
+                            },
+                            text = { Text("Export Luau") },
+                            onClick = {
+                                onExport()
+                                onCompactMenuChange(false)
+                            }
+                        )
+                        HorizontalDivider()
+                        DropdownMenuItem(
+                            leadingIcon = {
+                                Image(painterResource(R.drawable.vanilla_action_undo), null, Modifier.size(20.dp))
+                            },
+                            text = { Text("Undo") },
+                            onClick = {
+                                onUndo()
+                                onCompactMenuChange(false)
+                            }
+                        )
+                        DropdownMenuItem(
+                            leadingIcon = {
+                                Image(painterResource(R.drawable.vanilla_action_redo), null, Modifier.size(20.dp))
+                            },
+                            text = { Text("Redo") },
+                            onClick = {
+                                onRedo()
+                                onCompactMenuChange(false)
+                            }
+                        )
+                        DropdownMenuItem(
+                            leadingIcon = {
+                                Image(painterResource(R.drawable.vanilla_action_grid), null, Modifier.size(20.dp))
+                            },
+                            text = { Text(if (showGrid) "Hide Grid" else "Show Grid") },
+                            onClick = {
+                                onToggleGrid()
+                                onCompactMenuChange(false)
+                            }
+                        )
+                        DropdownMenuItem(
+                            leadingIcon = {
+                                Image(painterResource(R.drawable.vanilla_action_settings), null, Modifier.size(20.dp))
+                            },
+                            text = { Text("Settings") },
+                            onClick = {
+                                onSettings()
+                                onCompactMenuChange(false)
+                            }
+                        )
+                    }
+                }
+            }
+
+            FilledTonalButton(
+                onClick = onTogglePreview,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (isPreviewMode) Color(0xFF1F7A4D) else Color(0xFF32353B),
+                    contentColor = Color.White
+                ),
+                contentPadding = PaddingValues(horizontal = if (isCompact) 8.dp else 12.dp, vertical = 0.dp),
+                modifier = Modifier
+                    .padding(start = 4.dp)
+                    .height(40.dp)
+            ) {
+                Icon(
+                    imageVector = if (isPreviewMode) Icons.Default.Visibility else Icons.Default.Edit,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = Color.White
+                )
+                if (!isCompact) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (isPreviewMode) "Preview" else "Edit",
+                        fontSize = 12.sp,
+                        color = Color.White,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -809,9 +859,9 @@ private fun MacSettingsDialog(
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             modifier = Modifier
-                .fillMaxWidth(0.96f)
-                .fillMaxHeight(0.92f)
-                .widthIn(max = 760.dp),
+                .fillMaxWidth(0.98f)
+                .fillMaxHeight(0.96f)
+                .widthIn(max = 920.dp),
             color = Color(0xFF202124),
             shape = RoundedCornerShape(12.dp),
             border = BorderStroke(1.dp, Color(0xFF3D4148))
@@ -839,13 +889,13 @@ private fun MacSettingsDialog(
                 Row(modifier = Modifier.fillMaxSize()) {
                     Column(
                         modifier = Modifier
-                            .width(164.dp)
+                            .width(184.dp)
                             .fillMaxHeight()
                             .background(Color(0xFF25272C))
                             .padding(8.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        listOf("General", "Theme", "DPI", "Grid").forEach { item ->
+                        listOf("General", "Theme", "DPI", "Grid", "Render", "Export").forEach { item ->
                             MacSettingsSidebarItem(
                                 label = item,
                                 selected = section == item,
@@ -890,20 +940,22 @@ private fun MacSettingsDialog(
                                 }
                             }
                             "DPI" -> {
-                                SettingsInfoRow("UI scale", "Chỉnh % giao diện cho từng máy, tablet hoặc phone landscape.")
+                                SettingsInfoRow("UI scale", "Default 40%. Chỉnh % giao diện cho từng máy, tablet hoặc phone landscape.")
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Slider(
                                         value = uiScalePercent.toFloat(),
                                         onValueChange = { raw ->
                                             onUiScalePercentChange((raw / 5f).roundToInt() * 5)
                                         },
-                                        valueRange = 75f..135f,
-                                        steps = 11,
+                                        valueRange = 40f..140f,
+                                        steps = 19,
                                         modifier = Modifier.weight(1f),
                                         colors = SliderDefaults.colors(thumbColor = accent, activeTrackColor = accent)
                                     )
                                     Text("$uiScalePercent%", color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.width(64.dp))
                                 }
+                                SettingsInfoRow("Fullscreen", "System status/navigation bar được ẩn bằng immersive mode.")
+                                SettingsInfoRow("Canvas fit", "Viewport fit tính theo DPI scale để không chừa dư khoảng trống.")
                             }
                             "Grid" -> {
                                 MacSettingsToggle("Show grid", "Hiện lưới trong viewport.", showGrid, onShowGridChange)
@@ -921,6 +973,18 @@ private fun MacSettingsDialog(
                                     )
                                     OutlinedButton(onClick = { onGridSizeChange((gridSize + 4).coerceAtMost(64)) }) { Text("+") }
                                 }
+                            }
+                            "Render" -> {
+                                SettingsInfoRow("Viewport renderer", "High-detail grid, safe area, animated 3D cube và viewport chrome.")
+                                SettingsInfoRow("Render target", "Landscape canvas optimized for Roblox Studio style editing.")
+                                SettingsInfoRow("Preview scale", "Canvas zoom và DPI scale tách riêng để edit chính xác hơn.")
+                                SettingsInfoRow("Mobile support", "Touch pan/zoom, compact sidebars, minimized rails.")
+                            }
+                            "Export" -> {
+                                SettingsInfoRow("Export window", "Custom GUI có topbar, close, copy/share và tabs Luau/Rojo.")
+                                SettingsInfoRow("Luau tab", "Runtime LocalScript xuất trực tiếp để paste vào Roblox Studio.")
+                                SettingsInfoRow("Rojo tab", "Bundle file structure cho project Rojo.")
+                                SettingsInfoRow("DPI preview", "Code preview giữ font readable kể cả UI 40%.")
                             }
                             else -> {
                                 MacSettingsToggle("Single drag mode", "Khóa camera khi chọn object, kéo góc để resize.", useSingleDragMode, onUseSingleDragModeChange)

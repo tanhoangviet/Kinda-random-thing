@@ -60,8 +60,14 @@ fun RobloxCanvasPreview(
     Box(
         modifier = Modifier
             .size(screenWidth.dp, screenHeight.dp)
-            .background(Color(25, 25, 25))
-            .border(1.dp, Color(60, 60, 65))
+            .background(
+                Brush.linearGradient(
+                    colors = listOf(Color(0xFF181B22), Color(0xFF10131A)),
+                    start = Offset.Zero,
+                    end = Offset(screenWidth.toFloat(), screenHeight.toFloat())
+                )
+            )
+            .border(1.dp, Color(72, 80, 92))
     ) {
         // Draw Grid if enabled
         if (showGrid && !isPreviewMode) {
@@ -100,34 +106,55 @@ fun RobloxCanvasPreview(
 
 @Composable
 fun CanvasGrid(gridSize: Int, width: Int, height: Int) {
-    // Elegant dot/line grid using compose canvas or standard overlay lines
     androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
-        val strokeColor = Color(50, 50, 50)
-        val step = gridSize.toFloat()
+        val minorColor = Color(78, 86, 98, 70)
+        val majorColor = Color(100, 170, 230, 95)
+        val axisColor = Color(255, 181, 77, 140)
+        val step = gridSize.toFloat().coerceAtLeast(2f)
+        val majorEvery = 4
+        val centerX = size.width / 2f
+        val centerY = size.height / 2f
 
-        // Horizontal lines
         var y = 0f
+        var row = 0
         while (y < size.height) {
+            val isMajor = row % majorEvery == 0
             drawLine(
-                color = strokeColor,
+                color = if (isMajor) majorColor else minorColor,
                 start = androidx.compose.ui.geometry.Offset(0f, y),
                 end = androidx.compose.ui.geometry.Offset(size.width, y),
-                strokeWidth = 0.5.dp.toPx()
+                strokeWidth = if (isMajor) 0.9.dp.toPx() else 0.45.dp.toPx()
             )
             y += step
+            row += 1
         }
 
-        // Vertical lines
         var x = 0f
+        var column = 0
         while (x < size.width) {
+            val isMajor = column % majorEvery == 0
             drawLine(
-                color = strokeColor,
+                color = if (isMajor) majorColor else minorColor,
                 start = androidx.compose.ui.geometry.Offset(x, 0f),
                 end = androidx.compose.ui.geometry.Offset(x, size.height),
-                strokeWidth = 0.5.dp.toPx()
+                strokeWidth = if (isMajor) 0.9.dp.toPx() else 0.45.dp.toPx()
             )
             x += step
+            column += 1
         }
+
+        drawLine(
+            color = axisColor,
+            start = Offset(centerX, 0f),
+            end = Offset(centerX, size.height),
+            strokeWidth = 1.dp.toPx()
+        )
+        drawLine(
+            color = axisColor,
+            start = Offset(0f, centerY),
+            end = Offset(size.width, centerY),
+            strokeWidth = 1.dp.toPx()
+        )
     }
 }
 
@@ -560,6 +587,39 @@ fun RenderRobloxObject(
                     contentAlignment = Alignment.Center
                 ) {
                     androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
+                        drawRect(
+                            Brush.radialGradient(
+                                colors = listOf(Color(0xFF1F4D68), Color(0xFF090B10)),
+                                center = Offset(size.width * 0.45f, size.height * 0.35f),
+                                radius = size.minDimension * 0.75f
+                            )
+                        )
+                        val horizon = size.height * 0.68f
+                        for (i in 0..8) {
+                            val t = i / 8f
+                            val y = horizon + (size.height - horizon) * t * t
+                            drawLine(
+                                color = Color(90, 170, 230, (70 * (1f - t)).roundToInt()),
+                                start = Offset(0f, y),
+                                end = Offset(size.width, y),
+                                strokeWidth = 0.7.dp.toPx()
+                            )
+                        }
+                        for (i in -8..8) {
+                            val offset = i * size.width * 0.09f
+                            drawLine(
+                                color = Color(90, 170, 230, 55),
+                                start = Offset(size.width / 2f + offset * 0.2f, horizon),
+                                end = Offset(size.width / 2f + offset, size.height),
+                                strokeWidth = 0.7.dp.toPx()
+                            )
+                        }
+                        drawCircle(
+                            color = Color(0, 0, 0, 120),
+                            radius = size.minDimension * 0.22f,
+                            center = Offset(size.width / 2f, size.height * 0.72f)
+                        )
+
                         val vertices = listOf(
                             Point3D(-1f, -1f, -1f),
                             Point3D(1f, -1f, -1f),
@@ -615,6 +675,7 @@ fun RenderRobloxObject(
                                 close()
                             }
                             drawPath(path, baseColor)
+                            drawPath(path, Color.White.copy(alpha = 0.08f))
                             drawPath(path, Color(220, 245, 255, 150), style = Stroke(width = 1.dp.toPx()))
                         }
                     }
