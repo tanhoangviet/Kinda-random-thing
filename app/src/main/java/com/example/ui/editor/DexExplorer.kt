@@ -2,6 +2,7 @@
 package com.example.ui.editor
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -16,9 +17,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.R
 import com.example.data.model.RobloxClass
 import com.example.data.model.RobloxObject
 
@@ -60,12 +63,20 @@ fun DexExplorerPanel(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "DEX EXPLORER",
-                color = Color(241, 196, 15), // Yellow DarkDex highlight
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Image(
+                    painter = painterResource(id = R.drawable.vanilla_action_explorer),
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "EXPLORER",
+                    color = Color(0xFFE7EAEE),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
             IconButton(
                 onClick = { showFilterDropdown = true },
                 modifier = Modifier.size(24.dp)

@@ -1,4 +1,7 @@
-@file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@file:OptIn(
+    androidx.compose.foundation.ExperimentalFoundationApi::class,
+    androidx.compose.foundation.layout.ExperimentalLayoutApi::class
+)
 package com.example.ui.editor
 
 import androidx.compose.foundation.background
@@ -46,6 +49,7 @@ fun RobloxCanvasPreview(
     screenHeight: Int,
     scaleFactor: Float,
     showGrid: Boolean,
+    snapToGrid: Boolean,
     gridSize: Int,
     isPreviewMode: Boolean,
     useSingleDragMode: Boolean = false,
@@ -72,6 +76,7 @@ fun RobloxCanvasPreview(
                 onSelect = onSelect,
                 onMoveOrResize = onMoveOrResize,
                 isPreviewMode = isPreviewMode,
+                snapToGrid = snapToGrid,
                 gridSize = gridSize,
                 scaleFactor = scaleFactor,
                 useSingleDragMode = useSingleDragMode,
@@ -133,6 +138,7 @@ fun RenderRobloxObject(
     onSelect: (String) -> Unit,
     onMoveOrResize: (String, UDim2, UDim2) -> Unit,
     isPreviewMode: Boolean,
+    snapToGrid: Boolean,
     gridSize: Int,
     scaleFactor: Float,
     useSingleDragMode: Boolean = false,
@@ -151,6 +157,7 @@ fun RenderRobloxObject(
     // Remember updated states to avoid capturing stale values in pointerInput
     val currentPos by rememberUpdatedState(pos)
     val currentSize by rememberUpdatedState(size)
+    val currentSnapToGrid by rememberUpdatedState(snapToGrid)
     val currentGridSize by rememberUpdatedState(gridSize)
     val currentScaleFactor by rememberUpdatedState(scaleFactor)
     val currentParentW by rememberUpdatedState(parentW)
@@ -308,11 +315,11 @@ fun RenderRobloxObject(
                                 val newOffsetX = startPos.offsetX + dragAccumulatedX
                                 val newOffsetY = startPos.offsetY + dragAccumulatedY
                                 
-                                val finalX = if (currentGridSize > 1) {
+                                val finalX = if (currentSnapToGrid && currentGridSize > 1) {
                                     (newOffsetX.roundToInt() / currentGridSize) * currentGridSize
                                 } else newOffsetX.roundToInt()
                                 
-                                val finalY = if (currentGridSize > 1) {
+                                val finalY = if (currentSnapToGrid && currentGridSize > 1) {
                                     (newOffsetY.roundToInt() / currentGridSize) * currentGridSize
                                 } else newOffsetY.roundToInt()
                                 
@@ -358,11 +365,11 @@ fun RenderRobloxObject(
                                 dragStartX += dxDp
                                 dragStartY += dyDp
                                 
-                                val finalX = if (currentGridSize > 1) {
+                                val finalX = if (currentSnapToGrid && currentGridSize > 1) {
                                     (dragStartX.roundToInt() / currentGridSize) * currentGridSize
                                 } else dragStartX.roundToInt()
                                 
-                                val finalY = if (currentGridSize > 1) {
+                                val finalY = if (currentSnapToGrid && currentGridSize > 1) {
                                     (dragStartY.roundToInt() / currentGridSize) * currentGridSize
                                 } else dragStartY.roundToInt()
                                 
@@ -582,15 +589,22 @@ fun RenderRobloxObject(
 
         // Apply Layout engines visually on preview if possible
         // For our mobile preview, we render the children recursively!
-        val childrenToRender = obj.children.filter { 
-            it.className != RobloxClass.UICorner && 
-            it.className != RobloxClass.UIStroke &&
-            it.className != RobloxClass.UIAspectRatioConstraint &&
-            it.className != RobloxClass.UIShadow
-        }
+        val nonRenderableClasses = setOf(
+            RobloxClass.UICorner,
+            RobloxClass.UIStroke,
+            RobloxClass.UIGradient,
+            RobloxClass.UIAspectRatioConstraint,
+            RobloxClass.UIScale,
+            RobloxClass.UIShadow,
+            RobloxClass.UIPadding,
+            RobloxClass.UIListLayout,
+            RobloxClass.UIGridLayout
+        )
+        val childrenToRender = obj.children.filter { it.className !in nonRenderableClasses }
 
         // If it is a list or grid layout, we can stack them!
         val listLayout = obj.children.firstOrNull { it.className == RobloxClass.UIListLayout }
+        val gridLayout = obj.children.firstOrNull { it.className == RobloxClass.UIGridLayout }
         if (listLayout != null && childrenToRender.isNotEmpty()) {
             val isVertical = (listLayout.properties["FillDirection"] as? String ?: "Vertical") == "Vertical"
             val spacing = (listLayout.properties["Padding"] as? UDim2)?.offsetY ?: 8
@@ -624,6 +638,30 @@ fun RenderRobloxObject(
                     }
                 }
             }
+        } else if (gridLayout != null && childrenToRender.isNotEmpty()) {
+            val cellSize = gridLayout.properties["CellSize"] as? UDim2 ?: UDim2(0f, 96, 0f, 96)
+            val cellPadding = gridLayout.properties["CellPadding"] as? UDim2 ?: UDim2(0f, 8, 0f, 8)
+            val cellW = ((cellSize.scaleX * wPx) + cellSize.offsetX).coerceAtLeast(32f)
+            val cellH = ((cellSize.scaleY * hPx) + cellSize.offsetY).coerceAtLeast(32f)
+            val gapX = ((cellPadding.scaleX * wPx) + cellPadding.offsetX).coerceAtLeast(0f)
+            val gapY = ((cellPadding.scaleY * hPx) + cellPadding.offsetY).coerceAtLeast(0f)
+
+            FlowRow(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(gapX.dp),
+                verticalArrangement = Arrangement.spacedBy(gapY.dp)
+            ) {
+                childrenToRender.forEach { child ->
+                    RenderLayoutChild(
+                        obj = child,
+                        parentW = cellW,
+                        parentH = cellH,
+                        fillParent = true
+                    )
+                }
+            }
         } else {
             // Otherwise, render free-form absolute positioned children
             childrenToRender.forEach { child ->
@@ -635,6 +673,7 @@ fun RenderRobloxObject(
                     onSelect = onSelect,
                     onMoveOrResize = onMoveOrResize,
                     isPreviewMode = isPreviewMode,
+                    snapToGrid = snapToGrid,
                     gridSize = gridSize,
                     scaleFactor = scaleFactor,
                     useSingleDragMode = useSingleDragMode,
@@ -679,8 +718,8 @@ fun RenderRobloxObject(
                                         val newW = startSize.offsetX - dragAccumulatedX
                                         val newH = startSize.offsetY - dragAccumulatedY
                                         
-                                        val finalW = if (currentGridSize > 1) (newW.roundToInt() / currentGridSize) * currentGridSize else newW.roundToInt()
-                                        val finalH = if (currentGridSize > 1) (newH.roundToInt() / currentGridSize) * currentGridSize else newH.roundToInt()
+                                        val finalW = if (currentSnapToGrid && currentGridSize > 1) (newW.roundToInt() / currentGridSize) * currentGridSize else newW.roundToInt()
+                                        val finalH = if (currentSnapToGrid && currentGridSize > 1) (newH.roundToInt() / currentGridSize) * currentGridSize else newH.roundToInt()
                                         
                                         val minOffsetX = (10 - (startSize.scaleX * currentParentW)).toInt()
                                         val minOffsetY = (10 - (startSize.scaleY * currentParentH)).toInt()
@@ -738,8 +777,8 @@ fun RenderRobloxObject(
                                         val newW = startSize.offsetX + dragAccumulatedX
                                         val newH = startSize.offsetY - dragAccumulatedY
                                         
-                                        val finalW = if (currentGridSize > 1) (newW.roundToInt() / currentGridSize) * currentGridSize else newW.roundToInt()
-                                        val finalH = if (currentGridSize > 1) (newH.roundToInt() / currentGridSize) * currentGridSize else newH.roundToInt()
+                                        val finalW = if (currentSnapToGrid && currentGridSize > 1) (newW.roundToInt() / currentGridSize) * currentGridSize else newW.roundToInt()
+                                        val finalH = if (currentSnapToGrid && currentGridSize > 1) (newH.roundToInt() / currentGridSize) * currentGridSize else newH.roundToInt()
                                         
                                         val minOffsetX = (10 - (startSize.scaleX * currentParentW)).toInt()
                                         val minOffsetY = (10 - (startSize.scaleY * currentParentH)).toInt()
@@ -795,8 +834,8 @@ fun RenderRobloxObject(
                                         val newW = startSize.offsetX - dragAccumulatedX
                                         val newH = startSize.offsetY + dragAccumulatedY
                                         
-                                        val finalW = if (currentGridSize > 1) (newW.roundToInt() / currentGridSize) * currentGridSize else newW.roundToInt()
-                                        val finalH = if (currentGridSize > 1) (newH.roundToInt() / currentGridSize) * currentGridSize else newH.roundToInt()
+                                        val finalW = if (currentSnapToGrid && currentGridSize > 1) (newW.roundToInt() / currentGridSize) * currentGridSize else newW.roundToInt()
+                                        val finalH = if (currentSnapToGrid && currentGridSize > 1) (newH.roundToInt() / currentGridSize) * currentGridSize else newH.roundToInt()
                                         
                                         val minOffsetX = (10 - (startSize.scaleX * currentParentW)).toInt()
                                         val minOffsetY = (10 - (startSize.scaleY * currentParentH)).toInt()
@@ -850,11 +889,11 @@ fun RenderRobloxObject(
                                         val newW = startSize.offsetX + dragAccumulatedX
                                         val newH = startSize.offsetY + dragAccumulatedY
                                         
-                                        val finalW = if (currentGridSize > 1) {
+                                        val finalW = if (currentSnapToGrid && currentGridSize > 1) {
                                             (newW.roundToInt() / currentGridSize) * currentGridSize
                                         } else newW.roundToInt()
                                         
-                                        val finalH = if (currentGridSize > 1) {
+                                        val finalH = if (currentSnapToGrid && currentGridSize > 1) {
                                             (newH.roundToInt() / currentGridSize) * currentGridSize
                                         } else newH.roundToInt()
                                         
@@ -910,11 +949,11 @@ fun RenderRobloxObject(
                                         val newW = startSize.offsetX + dragAccumulatedX
                                         val newH = startSize.offsetY + dragAccumulatedY
                                         
-                                        val finalW = if (currentGridSize > 1) {
+                                        val finalW = if (currentSnapToGrid && currentGridSize > 1) {
                                             (newW.roundToInt() / currentGridSize) * currentGridSize
                                         } else newW.roundToInt()
                                         
-                                        val finalH = if (currentGridSize > 1) {
+                                        val finalH = if (currentSnapToGrid && currentGridSize > 1) {
                                             (newH.roundToInt() / currentGridSize) * currentGridSize
                                         } else newH.roundToInt()
                                         
@@ -955,14 +994,19 @@ fun RenderRobloxObject(
 }
 
 @Composable
-fun RenderLayoutChild(obj: RobloxObject, parentW: Float, parentH: Float) {
+fun RenderLayoutChild(
+    obj: RobloxObject,
+    parentW: Float,
+    parentH: Float,
+    fillParent: Boolean = false
+) {
     val bgTrans = obj.properties["BackgroundTransparency"] as? Float ?: 0f
     val bgRaw = obj.properties["BackgroundColor3"] as? Color3 ?: Color3(163, 162, 165)
     val bgColor = Color(bgRaw.r, bgRaw.g, bgRaw.b).copy(alpha = (1.0f - bgTrans).coerceIn(0f, 1f))
     
     val size = obj.properties["Size"] as? UDim2 ?: UDim2(0.8f, 0, 0.2f, 0)
-    val w = ((size.scaleX * parentW) + size.offsetX).dp.coerceAtLeast(30.dp)
-    val h = ((size.scaleY * parentH) + size.offsetY).dp.coerceAtLeast(15.dp)
+    val w = if (fillParent) parentW.dp else ((size.scaleX * parentW) + size.offsetX).dp.coerceAtLeast(30.dp)
+    val h = if (fillParent) parentH.dp else ((size.scaleY * parentH) + size.offsetY).dp.coerceAtLeast(15.dp)
 
     Box(
         modifier = Modifier

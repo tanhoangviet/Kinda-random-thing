@@ -35,6 +35,7 @@ class GreetingScreenshotTest {
           screenHeight = 720,
           scaleFactor = 1.0f,
           showGrid = true,
+          snapToGrid = true,
           gridSize = 10,
           isPreviewMode = true
         )

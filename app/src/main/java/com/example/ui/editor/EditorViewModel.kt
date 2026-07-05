@@ -29,7 +29,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // Active project metadata
-    private val _currentProjectId = MutableStateFlow<String?>(null)
+    private val _currentProjectId = MutableStateFlow<String?>(createProjectId())
     val currentProjectId: StateFlow<String?> = _currentProjectId.asStateFlow()
 
     private val _currentProjectName = MutableStateFlow("New Project")
@@ -105,7 +105,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         saveHistoryState()
         val templateRoot = ProjectTemplates.createTemplateByName(templateName)
         
-        _currentProjectId.value = UUID.randomUUID().toString().replace("-", "").take(8)
+        _currentProjectId.value = createProjectId()
         _currentProjectName.value = name
         _currentProjectDescription.value = "Template: $templateName"
         _rootObject.value = templateRoot
@@ -145,7 +145,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
                 saveHistoryState()
                 val root = JSONObjectToRobloxObject(objectsArray.getJSONObject(0))
                 
-                _currentProjectId.value = UUID.randomUUID().toString().replace("-", "").take(8)
+                _currentProjectId.value = createProjectId()
                 _currentProjectName.value = name
                 _currentProjectDescription.value = "Imported JSON project"
                 _screenWidth.value = width
@@ -301,10 +301,25 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun updateProperty(id: String, propName: String, value: Any) {
+        if (propName == "Name" && value is String) {
+            renameObject(id, value)
+            return
+        }
         saveHistoryState()
         _rootObject.value = updateObjectInTree(_rootObject.value, id) { old ->
             val updated = old.properties.toMutableMap()
             updated[propName] = value
+            old.copy(properties = updated)
+        }
+        triggerAutosave()
+    }
+
+    fun updateTransform(id: String, position: UDim2, size: UDim2) {
+        saveHistoryState()
+        _rootObject.value = updateObjectInTree(_rootObject.value, id) { old ->
+            val updated = old.properties.toMutableMap()
+            updated["Position"] = position
+            updated["Size"] = size
             old.copy(properties = updated)
         }
         triggerAutosave()
@@ -444,13 +459,15 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     fun saveProjectToLocal() {
         val pid = _currentProjectId.value ?: return
         viewModelScope.launch(Dispatchers.IO) {
+            val now = System.currentTimeMillis()
+            val existing = repository.getProjectById(pid)
             val jsonStr = exportProjectAsJson()
             val entity = ProjectEntity(
                 id = pid,
                 name = _currentProjectName.value,
                 description = _currentProjectDescription.value,
-                createdAt = System.currentTimeMillis(),
-                updatedAt = System.currentTimeMillis(),
+                createdAt = existing?.createdAt ?: now,
+                updatedAt = now,
                 screenWidth = _screenWidth.value,
                 screenHeight = _screenHeight.value,
                 rootJson = jsonStr
@@ -540,12 +557,16 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private fun copyObjectWithNewIds(original: RobloxObject): RobloxObject {
-        val newId = "obj_" + UUID.randomUUID().toString().replace("-", "").take(8)
+        val newId = "obj_" + createProjectId()
         val newChildren = original.children.map { copyObjectWithNewIds(it) }
         return original.copy(
             id = newId,
             name = "${original.name}_Copy",
             children = newChildren
         )
+    }
+
+    private fun createProjectId(): String {
+        return UUID.randomUUID().toString().replace("-", "").take(8)
     }
 }

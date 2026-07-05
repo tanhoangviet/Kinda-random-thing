@@ -18,7 +18,7 @@ class MainActivity : ComponentActivity() {
     super.onCreate(savedInstanceState)
     enableEdgeToEdge()
     setContent {
-      MyApplicationTheme(darkTheme = true) { // Force dark Roblox aesthetic
+      MyApplicationTheme(darkTheme = true, dynamicColor = false) {
         Surface(
           modifier = Modifier.fillMaxSize(),
           color = MaterialTheme.colorScheme.background

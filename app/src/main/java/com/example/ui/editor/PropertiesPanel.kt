@@ -1,6 +1,7 @@
 package com.example.ui.editor
 
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -19,10 +20,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.R
 import com.example.data.model.*
 
 @Composable
@@ -86,12 +89,20 @@ fun PropertiesPanel(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "PROPERTIES",
-                color = Color(0, 162, 255), // Roblox blue accent
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Image(
+                    painter = painterResource(id = R.drawable.vanilla_action_properties),
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "PROPERTIES",
+                    color = Color(0xFFE7EAEE),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
             Text(
                 text = selectedObj.className.name,
                 color = Color.Gray,
