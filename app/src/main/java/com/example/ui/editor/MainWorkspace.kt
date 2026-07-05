@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.data.model.RobloxClass
 import com.example.data.model.RobloxObject
+import kotlin.math.min
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,13 +66,33 @@ fun MainWorkspace(
     var showExportDialog by remember { mutableStateOf(false) }
     var showCompactMenu by remember { mutableStateOf(false) }
     var generatedLuauCode by remember { mutableStateOf("") }
+    var generatedRojoBundle by remember { mutableStateOf("") }
 
     // Canvas panning/zooming state
-    var canvasScale by remember(isCompact) { mutableStateOf(if (isCompact) 0.38f else 0.6f) }
+    val sidePanelReserve = if (!isCompact && !isPreviewMode) 560 else 0
+    val bottomReserve = if (isCompact) 76 else 28
+    val topReserve = if (isTopbarVisible) 72 else 8
+    val fitCanvasScale = min(
+        ((configuration.screenWidthDp - sidePanelReserve).coerceAtLeast(320)).toFloat() / screenWidth.coerceAtLeast(1).toFloat(),
+        ((configuration.screenHeightDp - topReserve - bottomReserve).coerceAtLeast(240)).toFloat() / screenHeight.coerceAtLeast(1).toFloat()
+    ).coerceIn(0.2f, 1.2f)
+    var canvasScale by remember { mutableStateOf(fitCanvasScale) }
     var canvasOffsetX by remember { mutableStateOf(0f) }
     var canvasOffsetY by remember { mutableStateOf(0f) }
 
     var activeTabMobile by remember { mutableStateOf("Viewport") }
+
+    LaunchedEffect(configuration.screenWidthDp, configuration.screenHeightDp, screenWidth, screenHeight, isCompact) {
+        canvasScale = fitCanvasScale
+        canvasOffsetX = 0f
+        canvasOffsetY = 0f
+    }
+
+    fun openExportDialog() {
+        generatedLuauCode = LuauGenerator.generate(rootObj)
+        generatedRojoBundle = LuauGenerator.generateRojoBundle(rootObj, projectName)
+        showExportDialog = true
+    }
 
     // Scaffold with a clean dark theme
     Box(modifier = modifier.fillMaxSize()) {
@@ -92,7 +113,7 @@ fun MainWorkspace(
                             Spacer(modifier = Modifier.width(8.dp))
                             Column {
                                 Text(
-                                    text = "VANILLA STUDIO UI",
+                                    text = "ROBLOX STUDIO UI",
                                     color = Color(0xFFE7EAEE),
                                     fontSize = if (isCompact) 10.sp else 12.sp,
                                     fontWeight = FontWeight.Bold,
@@ -100,7 +121,7 @@ fun MainWorkspace(
                                 )
                                 if (!isCompact) {
                                     Text(
-                                        text = "$projectName  |  $devicePreview",
+                                        text = "$projectName  |  $devicePreview  |  Landscape",
                                         color = Color(0xFF8FBFF8),
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.Medium
@@ -130,10 +151,7 @@ fun MainWorkspace(
                             ToolbarIconButton(
                                 iconRes = R.drawable.vanilla_action_code,
                                 text = "Export",
-                                onClick = {
-                                    generatedLuauCode = LuauGenerator.generate(rootObj)
-                                    showExportDialog = true
-                                }
+                                onClick = { openExportDialog() }
                             )
 
                             StudioToolbarDivider()
@@ -189,8 +207,7 @@ fun MainWorkspace(
                                         },
                                         text = { Text("Export Luau") },
                                         onClick = {
-                                            generatedLuauCode = LuauGenerator.generate(rootObj)
-                                            showExportDialog = true
+                                            openExportDialog()
                                             showCompactMenu = false
                                         }
                                     )
@@ -294,7 +311,7 @@ fun MainWorkspace(
                 if ((!isCompact && !isPreviewMode) || (isCompact && activeTabMobile == "Explorer")) {
                     Box(
                         modifier = Modifier
-                            .then(if (!isCompact) Modifier.width(210.dp) else Modifier.weight(1f))
+                            .then(if (!isCompact) Modifier.width(248.dp) else Modifier.weight(1f))
                             .fillMaxHeight()
                     ) {
                         DexExplorerPanel(
@@ -354,7 +371,7 @@ fun MainWorkspace(
                         // Interactive background viewport
                         Box(
                             modifier = Modifier
-                                .fillMaxSize()
+                                .align(Alignment.Center)
                                 .graphicsLayer(
                                     scaleX = canvasScale,
                                     scaleY = canvasScale,
@@ -436,7 +453,7 @@ fun MainWorkspace(
                             IconButton(onClick = { canvasScale = (canvasScale - 0.1f).coerceIn(0.2f, 3.0f) }, modifier = Modifier.size(44.dp)) {
                                 Image(painterResource(R.drawable.vanilla_action_zoom_out), contentDescription = "Zoom Out", modifier = Modifier.size(22.dp))
                             }
-                            IconButton(onClick = { canvasScale = if (isCompact) 0.38f else 0.6f; canvasOffsetX = 0f; canvasOffsetY = 0f }, modifier = Modifier.size(44.dp)) {
+                            IconButton(onClick = { canvasScale = fitCanvasScale; canvasOffsetX = 0f; canvasOffsetY = 0f }, modifier = Modifier.size(44.dp)) {
                                 Icon(Icons.Default.Refresh, contentDescription = "Reset View", tint = Color(0xFFE7EAEE), modifier = Modifier.size(20.dp))
                             }
 
@@ -509,7 +526,7 @@ fun MainWorkspace(
                 if ((!isCompact && !isPreviewMode) || (isCompact && activeTabMobile == "Properties")) {
                     Box(
                         modifier = Modifier
-                            .then(if (!isCompact) Modifier.width(230.dp) else Modifier.weight(1f))
+                            .then(if (!isCompact) Modifier.width(304.dp) else Modifier.weight(1f))
                             .fillMaxHeight()
                     ) {
                         val parentName = selectedId?.let { id ->
@@ -599,6 +616,15 @@ fun MainWorkspace(
                         )
                     )
                 }
+            } else {
+                StudioStatusBar(
+                    selectedObj = selectedObj,
+                    projectName = projectName,
+                    devicePreview = devicePreview,
+                    canvasScale = canvasScale,
+                    showGrid = showGrid,
+                    snapToGrid = snapToGrid
+                )
             }
         }
     }
@@ -630,6 +656,7 @@ fun MainWorkspace(
     if (showExportDialog) {
         ExportLuauDialog(
             luauCode = generatedLuauCode,
+            rojoBundle = generatedRojoBundle,
             onDismiss = { showExportDialog = false }
         )
     }
@@ -820,6 +847,55 @@ fun MainWorkspace(
         }
     }
     } // Close root Box
+}
+
+@Composable
+private fun StudioStatusBar(
+    selectedObj: RobloxObject?,
+    projectName: String,
+    devicePreview: String,
+    canvasScale: Float,
+    showGrid: Boolean,
+    snapToGrid: Boolean
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(28.dp)
+            .background(Color(0xFF202124))
+            .border(0.5.dp, Color(0xFF3D4148))
+            .padding(horizontal = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text(
+            text = projectName,
+            color = Color(0xFFE7EAEE),
+            fontSize = 10.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            text = selectedObj?.let { "${it.className.name}: ${it.name}" } ?: "No selection",
+            color = Color(0xFFA6ACB3),
+            fontSize = 10.sp,
+            maxLines = 1,
+            modifier = Modifier.weight(1.4f)
+        )
+        Text(devicePreview, color = Color(0xFFA6ACB3), fontSize = 10.sp)
+        Text("Zoom ${(canvasScale * 100).toInt()}%", color = Color(0xFFA6ACB3), fontSize = 10.sp)
+        Text(
+            text = if (showGrid) "Grid on" else "Grid off",
+            color = if (showGrid) Color(0xFF8FBFF8) else Color(0xFFA6ACB3),
+            fontSize = 10.sp
+        )
+        Text(
+            text = if (snapToGrid) "Snap on" else "Snap off",
+            color = if (snapToGrid) Color(0xFF8FBFF8) else Color(0xFFA6ACB3),
+            fontSize = 10.sp
+        )
+    }
 }
 
 // Utility: Toolbar icon button

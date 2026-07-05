@@ -9,7 +9,11 @@ object LuauGenerator {
         val sb = StringBuilder()
         
         sb.append("--[[\n")
-        sb.append("    Generated with Roblox UI Designer Mobile\n")
+        sb.append("    Generated with Roblox UI Designer Mobile")
+        if (style.isNotBlank()) {
+            sb.append(" ($style)")
+        }
+        sb.append("\n")
         sb.append("    ----------------------------------------\n")
         sb.append("    - Hướng dẫn: Bạn có thể sử dụng StyLua để tự động định dạng (format) lại đoạn mã này.\n")
         sb.append("    - Hướng dẫn: Sử dụng Darklua để build/bundle, tối ưu hóa hoặc rút gọn (minify) code.\n")
@@ -51,7 +55,7 @@ object LuauGenerator {
                 sb.append("GUI[\"$key\"] = script.Parent -- Root element assuming script is inside it\n")
             } else {
                 sb.append("GUI[\"$key\"] = Instance.new(\"${obj.className.name}\")\n")
-                sb.append("GUI[\"$key\"][\"Name\"] = \"${obj.name}\"\n")
+                sb.append("GUI[\"$key\"][\"Name\"] = ${formatLuauString(obj.name)}\n")
             }
             
             // Assign properties
@@ -85,6 +89,39 @@ object LuauGenerator {
         sb.append("return GUI\n")
         return sb.toString()
     }
+
+    fun generateRojoBundle(root: RobloxObject, projectName: String = "Vanilla UI"): String {
+        val safeProjectName = projectName.ifBlank { "Vanilla UI" }
+        val scriptFileName = "${safeFileName(root.name)}.client.lua"
+        val defaultProjectJson = """
+{
+  "name": ${formatJsonString(safeProjectName)},
+  "tree": {
+    "${'$'}className": "DataModel",
+    "StarterPlayer": {
+      "${'$'}className": "StarterPlayer",
+      "StarterPlayerScripts": {
+        "${'$'}className": "StarterPlayerScripts",
+        "BuildVanillaUI": {
+          "${'$'}path": "src/client/$scriptFileName"
+        }
+      }
+    }
+  }
+}
+""".trimIndent()
+
+        return buildString {
+            appendLine("-- Rojo portable export")
+            appendLine("-- Tao 2 file ben duoi trong project Rojo cua ban.")
+            appendLine()
+            appendLine("===== default.project.json =====")
+            appendLine(defaultProjectJson)
+            appendLine()
+            appendLine("===== src/client/$scriptFileName =====")
+            append(generate(root = root, style = "Rojo", includeMountCode = true))
+        }
+    }
     
     private fun formatGradientColor(colorStr: String): String {
         return try {
@@ -112,9 +149,17 @@ object LuauGenerator {
         if (className == RobloxClass.UIGradient && propName == "Color" && value is String) {
             return formatGradientColor(value)
         }
+        if (className == RobloxClass.UIGradient && propName == "Transparency" && value is Number) {
+            return "NumberSequence.new(${value.toLuauNumber()})"
+        }
+        if (isUDimProperty(className, propName) && value is UDim2) {
+            return formatUDim(propName, value)
+        }
         
         val enumProperties = mapOf(
             "Font" to "Enum.Font.",
+            "TextXAlignment" to "Enum.TextXAlignment.",
+            "TextYAlignment" to "Enum.TextYAlignment.",
             "ScaleType" to "Enum.ScaleType.",
             "FillDirection" to "Enum.FillDirection.",
             "HorizontalAlignment" to "Enum.HorizontalAlignment.",
@@ -133,20 +178,95 @@ object LuauGenerator {
         return when (value) {
             is Boolean -> if (value) "true" else "false"
             is Int -> value.toString()
-            is Float -> value.toString()
-            is Double -> value.toString()
-            is String -> "\"${value.replace("\"", "\\\"")}\""
+            is Float -> value.toLuauNumber()
+            is Double -> value.toLuauNumber()
+            is String -> formatLuauString(value, multiline = propName == "Source")
             is UDim2 -> "UDim2.new(${value.scaleX}, ${value.offsetX}, ${value.scaleY}, ${value.offsetY})"
             is Vector2 -> "Vector2.new(${value.x}, ${value.y})"
             is Color3 -> "Color3.fromRGB(${value.r}, ${value.g}, ${value.b})"
             else -> null
         }
     }
+
+    private fun isUDimProperty(className: RobloxClass, propName: String): Boolean {
+        return when (className) {
+            RobloxClass.UIListLayout -> propName == "Padding"
+            RobloxClass.UIPadding -> propName in listOf("PaddingTop", "PaddingBottom", "PaddingLeft", "PaddingRight")
+            RobloxClass.UICorner -> propName == "CornerRadius"
+            else -> false
+        }
+    }
+
+    private fun formatUDim(propName: String, value: UDim2): String {
+        val useY = propName in listOf("Padding", "PaddingTop", "PaddingBottom")
+        val scale = if (useY) value.scaleY else value.scaleX
+        val offset = if (useY) value.offsetY else value.offsetX
+        return "UDim.new($scale, $offset)"
+    }
+
+    private fun formatLuauString(value: String, multiline: Boolean = false): String {
+        if (multiline && value.contains('\n')) {
+            var equals = ""
+            while (value.contains("]$equals]")) {
+                equals += "="
+            }
+            return "[$equals[\n$value\n]$equals]"
+        }
+
+        return buildString {
+            append('"')
+            value.forEach { ch ->
+                when (ch) {
+                    '\\' -> append("\\\\")
+                    '"' -> append("\\\"")
+                    '\n' -> append("\\n")
+                    '\r' -> append("\\r")
+                    '\t' -> append("\\t")
+                    else -> append(ch)
+                }
+            }
+            append('"')
+        }
+    }
+
+    private fun Number.toLuauNumber(): String {
+        val doubleValue = toDouble()
+        if (doubleValue.isNaN() || doubleValue.isInfinite()) return "0"
+        return String.format(Locale.US, "%.6f", doubleValue)
+            .trimEnd('0')
+            .trimEnd('.')
+            .ifEmpty { "0" }
+    }
+
+    private fun formatJsonString(value: String): String {
+        return buildString {
+            append('"')
+            value.forEach { ch ->
+                when (ch) {
+                    '\\' -> append("\\\\")
+                    '"' -> append("\\\"")
+                    '\n' -> append("\\n")
+                    '\r' -> append("\\r")
+                    '\t' -> append("\\t")
+                    else -> append(ch)
+                }
+            }
+            append('"')
+        }
+    }
+
+    private fun safeFileName(value: String): String {
+        return value
+            .lowercase(Locale.US)
+            .replace("[^a-z0-9_-]+".toRegex(), "-")
+            .trim('-')
+            .ifBlank { "vanilla-ui" }
+    }
     
     private fun isPropertyRelevant(className: RobloxClass, propName: String): Boolean {
         val layoutOnlyProps = listOf("FillDirection", "HorizontalAlignment", "VerticalAlignment", "Padding", "SortOrder", "CellPadding", "CellSize")
         val paddingOnlyProps = listOf("PaddingTop", "PaddingBottom", "PaddingLeft", "PaddingRight")
-        val cornerOnlyProps = listOf("CornerRadius", "TopLeft", "TopRight", "BottomLeft", "BottomRight")
+        val cornerOnlyProps = listOf("CornerRadius")
         val strokeOnlyProps = listOf("Color", "Thickness", "Transparency", "ApplyStrokeMode")
         val textOnlyProps = listOf("Text", "TextColor3", "TextSize", "TextTransparency", "TextWrapped", "TextScaled", "Font", "TextXAlignment", "TextYAlignment", "RichText")
         val imageOnlyProps = listOf("Image", "ImageTransparency", "ScaleType")

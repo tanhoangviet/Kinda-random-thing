@@ -43,8 +43,8 @@ fun PropertiesPanel(
     if (selectedObj == null) {
         Box(
             modifier = modifier
-                .background(Color(25, 25, 30))
-                .border(1.dp, Color(45, 45, 50))
+                .background(Color(0xFF25272C))
+                .border(1.dp, Color(0xFF3D4148))
                 .padding(16.dp),
             contentAlignment = Alignment.Center
         ) {
@@ -78,14 +78,16 @@ fun PropertiesPanel(
 
     Column(
         modifier = modifier
-            .background(Color(25, 25, 30))
-            .border(1.dp, Color(45, 45, 50))
+            .background(Color(0xFF25272C))
+            .border(1.dp, Color(0xFF3D4148))
             .verticalScroll(scrollState)
             .padding(8.dp)
     ) {
         // Section Header
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(34.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -97,9 +99,9 @@ fun PropertiesPanel(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "PROPERTIES",
+                    text = "Properties",
                     color = Color(0xFFE7EAEE),
-                    fontSize = 12.sp,
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.Bold
                 )
             }
@@ -508,6 +510,42 @@ fun PropertiesPanel(
                         modifier = Modifier.scale(0.7f)
                     )
                 }
+
+                val textWrapped = selectedObj.properties["TextWrapped"] as? Boolean ?: true
+                PropertyRow(label = "TextWrapped") {
+                    Switch(
+                        checked = textWrapped,
+                        onCheckedChange = { onUpdateProperty(selectedObj.id, "TextWrapped", it) },
+                        modifier = Modifier.scale(0.7f)
+                    )
+                }
+
+                val richText = selectedObj.properties["RichText"] as? Boolean ?: false
+                PropertyRow(label = "RichText") {
+                    Switch(
+                        checked = richText,
+                        onCheckedChange = { onUpdateProperty(selectedObj.id, "RichText", it) },
+                        modifier = Modifier.scale(0.7f)
+                    )
+                }
+
+                val textXAlignment = selectedObj.properties["TextXAlignment"] as? String ?: "Center"
+                PropertyRow(label = "Text X") {
+                    StudioDropdownField(
+                        value = textXAlignment,
+                        options = listOf("Left", "Center", "Right"),
+                        onValueChange = { onUpdateProperty(selectedObj.id, "TextXAlignment", it) }
+                    )
+                }
+
+                val textYAlignment = selectedObj.properties["TextYAlignment"] as? String ?: "Center"
+                PropertyRow(label = "Text Y") {
+                    StudioDropdownField(
+                        value = textYAlignment,
+                        options = listOf("Top", "Center", "Bottom"),
+                        onValueChange = { onUpdateProperty(selectedObj.id, "TextYAlignment", it) }
+                    )
+                }
             }
         }
 
@@ -517,24 +555,60 @@ fun PropertiesPanel(
             PropertySection(title = "Layout Configurations") {
                 if (selectedObj.properties.containsKey("FillDirection")) {
                     val dir = selectedObj.properties["FillDirection"] as? String ?: "Vertical"
-                    var dirExpanded by remember { mutableStateOf(false) }
                     PropertyRow(label = "Direction") {
-                        Box {
-                            Button(
-                                onClick = { dirExpanded = true },
-                                modifier = Modifier.height(26.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(50, 50, 55))
-                            ) {
-                                Text(dir, fontSize = 9.sp)
-                            }
-                            DropdownMenu(expanded = dirExpanded, onDismissRequest = { dirExpanded = false }) {
-                                listOf("Vertical", "Horizontal").forEach { d ->
-                                    DropdownMenuItem(text = { Text(d) }, onClick = {
-                                        onUpdateProperty(selectedObj.id, "FillDirection", d)
-                                        dirExpanded = false
-                                    })
-                                }
-                            }
+                        StudioDropdownField(
+                            value = dir,
+                            options = listOf("Vertical", "Horizontal"),
+                            onValueChange = { onUpdateProperty(selectedObj.id, "FillDirection", it) }
+                        )
+                    }
+                }
+
+                if (selectedObj.properties.containsKey("Padding")) {
+                    val padding = selectedObj.properties["Padding"] as? UDim2 ?: UDim2(0f, 0, 0f, 8)
+                    PropertyRow(label = "Padding") {
+                        StepperInput(
+                            value = padding.offsetY,
+                            onValueChange = { onUpdateProperty(selectedObj.id, "Padding", padding.copy(offsetY = it)) },
+                            min = 0,
+                            max = 200
+                        )
+                    }
+                }
+
+                if (selectedObj.properties.containsKey("CellSize")) {
+                    val cellSize = selectedObj.properties["CellSize"] as? UDim2 ?: UDim2(0f, 80, 0f, 80)
+                    UDim2Editor(
+                        label = "CellSize",
+                        udim2 = cellSize,
+                        onValueChange = { onUpdateProperty(selectedObj.id, "CellSize", it) }
+                    )
+                }
+
+                if (selectedObj.properties.containsKey("CellPadding")) {
+                    val cellPadding = selectedObj.properties["CellPadding"] as? UDim2 ?: UDim2(0f, 6, 0f, 6)
+                    UDim2Editor(
+                        label = "CellPadding",
+                        udim2 = cellPadding,
+                        onValueChange = { onUpdateProperty(selectedObj.id, "CellPadding", it) }
+                    )
+                }
+
+                listOf(
+                    "PaddingTop" to "Pad Top",
+                    "PaddingBottom" to "Pad Bottom",
+                    "PaddingLeft" to "Pad Left",
+                    "PaddingRight" to "Pad Right"
+                ).forEach { (propName, label) ->
+                    if (selectedObj.properties.containsKey(propName)) {
+                        val padding = selectedObj.properties[propName] as? UDim2 ?: UDim2(0f, 8, 0f, 8)
+                        PropertyRow(label = label) {
+                            StepperInput(
+                                value = if (propName == "PaddingLeft" || propName == "PaddingRight") padding.offsetX else padding.offsetY,
+                                onValueChange = { onUpdateProperty(selectedObj.id, propName, padding.copy(offsetX = it, offsetY = it)) },
+                                min = 0,
+                                max = 200
+                            )
                         }
                     }
                 }
@@ -715,7 +789,8 @@ fun PropertySection(title: String, content: @Composable ColumnScope.() -> Unit) 
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color(40, 40, 45), RoundedCornerShape(4.dp))
+                .height(30.dp)
+                .background(Color(0xFF30333A), RoundedCornerShape(3.dp))
                 .clickable { expanded = !expanded }
                 .padding(horizontal = 6.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -750,7 +825,7 @@ fun PropertySection(title: String, content: @Composable ColumnScope.() -> Unit) 
 @Composable
 fun PropertyRow(label: String, content: @Composable () -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().height(28.dp),
+        modifier = Modifier.fillMaxWidth().heightIn(min = 32.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -761,10 +836,42 @@ fun PropertyRow(label: String, content: @Composable () -> Unit) {
             modifier = Modifier.weight(1f)
         )
         Box(
-            modifier = Modifier.weight(1.2f),
+            modifier = Modifier.weight(1.35f),
             contentAlignment = Alignment.CenterEnd
         ) {
             content()
+        }
+    }
+}
+
+@Composable
+fun StudioDropdownField(
+    value: String,
+    options: List<String>,
+    onValueChange: (String) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        Button(
+            onClick = { expanded = true },
+            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(30.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF32353B))
+        ) {
+            Text(value, fontSize = 10.sp, color = Color.White, maxLines = 1)
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            options.forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(option, fontSize = 11.sp) },
+                    onClick = {
+                        onValueChange(option)
+                        expanded = false
+                    }
+                )
+            }
         }
     }
 }
@@ -859,14 +966,14 @@ fun CoordinateInputBox(label: String, value: String, onValueChange: (String) -> 
             textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 9.sp, textAlign = TextAlign.Center),
             modifier = Modifier
                 .fillMaxWidth()
-                .height(24.dp),
+                .height(26.dp),
             cursorBrush = SolidColor(Color(0, 162, 255)),
             decorationBox = { innerTextField ->
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color(15, 15, 18), RoundedCornerShape(3.dp))
-                        .border(1.dp, Color(50, 50, 55), RoundedCornerShape(3.dp)),
+                        .background(Color(0xFF1C1E22), RoundedCornerShape(3.dp))
+                        .border(1.dp, Color(0xFF3D4148), RoundedCornerShape(3.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     innerTextField()
@@ -886,7 +993,7 @@ fun StepperInput(value: Int, onValueChange: (Int) -> Unit, min: Int, max: Int) {
     ) {
         IconButton(
             onClick = { if (value > min) onValueChange(value - 1) },
-            modifier = Modifier.size(20.dp)
+            modifier = Modifier.size(28.dp)
         ) {
             Icon(Icons.Default.Remove, contentDescription = "Decrement", tint = Color.White, modifier = Modifier.size(12.dp))
         }
@@ -900,7 +1007,7 @@ fun StepperInput(value: Int, onValueChange: (Int) -> Unit, min: Int, max: Int) {
         )
         IconButton(
             onClick = { if (value < max) onValueChange(value + 1) },
-            modifier = Modifier.size(20.dp)
+            modifier = Modifier.size(28.dp)
         ) {
             Icon(Icons.Default.Add, contentDescription = "Increment", tint = Color.White, modifier = Modifier.size(12.dp))
         }

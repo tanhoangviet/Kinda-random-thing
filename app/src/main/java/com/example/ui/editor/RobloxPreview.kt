@@ -397,18 +397,36 @@ fun RenderRobloxObject(
                 val wrapped = obj.properties["TextWrapped"] as? Boolean ?: true
                 val font = obj.properties["Font"] as? String ?: "SourceSans"
                 val textXAlign = obj.properties["TextXAlignment"] as? String ?: "Center"
+                val textYAlign = obj.properties["TextYAlignment"] as? String ?: "Center"
                 
                 val align = when (textXAlign) {
                     "Left" -> TextAlign.Left
                     "Right" -> TextAlign.Right
                     else -> TextAlign.Center
                 }
+                val contentAlignment = when (textYAlign) {
+                    "Top" -> when (textXAlign) {
+                        "Left" -> Alignment.TopStart
+                        "Right" -> Alignment.TopEnd
+                        else -> Alignment.TopCenter
+                    }
+                    "Bottom" -> when (textXAlign) {
+                        "Left" -> Alignment.BottomStart
+                        "Right" -> Alignment.BottomEnd
+                        else -> Alignment.BottomCenter
+                    }
+                    else -> when (textXAlign) {
+                        "Left" -> Alignment.CenterStart
+                        "Right" -> Alignment.CenterEnd
+                        else -> Alignment.Center
+                    }
+                }
                 
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(4.dp),
-                    contentAlignment = Alignment.Center
+                    contentAlignment = contentAlignment
                 ) {
                     Text(
                         text = text,

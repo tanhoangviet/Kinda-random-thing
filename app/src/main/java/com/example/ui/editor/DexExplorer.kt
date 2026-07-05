@@ -10,6 +10,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -53,13 +54,15 @@ fun DexExplorerPanel(
 
     Column(
         modifier = modifier
-            .background(Color(30, 30, 35))
-            .border(1.dp, Color(45, 45, 50))
-            .padding(8.dp)
+            .background(Color(0xFF25272C))
+            .border(1.dp, Color(0xFF3D4148))
+            .padding(6.dp)
     ) {
         // Header
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(34.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -71,15 +74,15 @@ fun DexExplorerPanel(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "EXPLORER",
+                    text = "Explorer",
                     color = Color(0xFFE7EAEE),
-                    fontSize = 12.sp,
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.Bold
                 )
             }
             IconButton(
                 onClick = { showFilterDropdown = true },
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(36.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.FilterList,
@@ -111,18 +114,18 @@ fun DexExplorerPanel(
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
-            placeholder = { Text("Search...", fontSize = 11.sp, color = Color.Gray) },
+            placeholder = { Text("Search Explorer", fontSize = 11.sp, color = Color.Gray) },
             singleLine = true,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(38.dp),
+                .height(40.dp),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = Color(0, 162, 255),
-                unfocusedBorderColor = Color(60, 60, 65),
+                unfocusedBorderColor = Color(0xFF3D4148),
                 focusedTextColor = Color.White,
                 unfocusedTextColor = Color.White,
-                focusedContainerColor = Color(20, 20, 25),
-                unfocusedContainerColor = Color(20, 20, 25)
+                focusedContainerColor = Color(0xFF1C1E22),
+                unfocusedContainerColor = Color(0xFF1C1E22)
             ),
             textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp)
         )
@@ -224,8 +227,11 @@ fun RenderExplorerNode(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(28.dp)
-                    .background(if (isSelected) Color(0, 162, 255, 60) else Color.Transparent)
+                    .height(34.dp)
+                    .background(
+                        color = if (isSelected) Color(0xFF0A84FF).copy(alpha = 0.22f) else Color.Transparent,
+                        shape = RoundedCornerShape(3.dp)
+                    )
                     .combinedClickable(
                         onClick = { onSelect(node.id) },
                         onDoubleClick = {
@@ -238,7 +244,7 @@ fun RenderExplorerNode(
                         },
                         onLongClick = { showContextMenu = true }
                     )
-                    .padding(start = (depth * 10).dp, end = 4.dp),
+                    .padding(start = (depth * 12).dp, end = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // Expand / Collapse icon
@@ -265,7 +271,7 @@ fun RenderExplorerNode(
                 Text(
                     text = node.name,
                     color = if (isSelected) Color.White else Color(220, 220, 220),
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                     maxLines = 1,
                     modifier = Modifier.weight(1f)
@@ -275,7 +281,7 @@ fun RenderExplorerNode(
                 if (isSelected) {
                     IconButton(
                         onClick = { showContextMenu = true },
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(28.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.MoreVert,

@@ -327,11 +327,15 @@ fun OpenProjectDialog(
 @Composable
 fun ExportLuauDialog(
     luauCode: String,
+    rojoBundle: String = "",
     onDismiss: () -> Unit
 ) {
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
     val scrollState = rememberScrollState()
+    var selectedMode by remember { mutableStateOf(0) }
+    val selectedCode = if (selectedMode == 0) luauCode else rojoBundle.ifBlank { luauCode }
+    val shareTitle = if (selectedMode == 0) "Chia se ma Luau" else "Chia se Rojo bundle"
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -341,16 +345,16 @@ fun ExportLuauDialog(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Export Roblox Luau Script", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                Text("Export Luau / Rojo", fontSize = 14.sp, fontWeight = FontWeight.Bold)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     IconButton(
                         onClick = {
                             val sendIntent = Intent().apply {
                                 action = Intent.ACTION_SEND
-                                putExtra(Intent.EXTRA_TEXT, luauCode)
+                                putExtra(Intent.EXTRA_TEXT, selectedCode)
                                 type = "text/plain"
                             }
-                            val shareIntent = Intent.createChooser(sendIntent, "Chia sẻ mã Luau")
+                            val shareIntent = Intent.createChooser(sendIntent, shareTitle)
                             context.startActivity(shareIntent)
                         },
                         modifier = Modifier.size(32.dp)
@@ -362,7 +366,7 @@ fun ExportLuauDialog(
                         )
                     }
                     IconButton(
-                        onClick = { clipboardManager.setText(AnnotatedString(luauCode)) },
+                        onClick = { clipboardManager.setText(AnnotatedString(selectedCode)) },
                         modifier = Modifier.size(32.dp)
                     ) {
                         Icon(
@@ -375,24 +379,49 @@ fun ExportLuauDialog(
             }
         },
         text = {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(250.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(Color(15, 15, 18))
-                    .border(1.dp, Color(45, 45, 50), RoundedCornerShape(6.dp))
-                    .padding(8.dp)
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text(
-                    text = luauCode,
-                    color = Color(46, 204, 113), // Code Green
-                    fontSize = 9.sp,
-                    fontFamily = FontFamily.Monospace,
+                Row(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(scrollState)
-                )
+                        .fillMaxWidth()
+                        .background(Color(32, 34, 38), RoundedCornerShape(4.dp))
+                        .padding(3.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    ExportModeButton(
+                        text = "Luau",
+                        selected = selectedMode == 0,
+                        onClick = { selectedMode = 0 },
+                        modifier = Modifier.weight(1f)
+                    )
+                    ExportModeButton(
+                        text = "Rojo",
+                        selected = selectedMode == 1,
+                        onClick = { selectedMode = 1 },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(270.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color(15, 15, 18))
+                        .border(1.dp, Color(45, 45, 50), RoundedCornerShape(6.dp))
+                        .padding(8.dp)
+                ) {
+                    Text(
+                        text = selectedCode,
+                        color = Color(46, 204, 113),
+                        fontSize = 9.sp,
+                        fontFamily = FontFamily.Monospace,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(scrollState)
+                    )
+                }
             }
         },
         confirmButton = {
@@ -401,10 +430,10 @@ fun ExportLuauDialog(
                     onClick = {
                         val sendIntent = Intent().apply {
                             action = Intent.ACTION_SEND
-                            putExtra(Intent.EXTRA_TEXT, luauCode)
+                            putExtra(Intent.EXTRA_TEXT, selectedCode)
                             type = "text/plain"
                         }
-                        val shareIntent = Intent.createChooser(sendIntent, "Chia sẻ mã Luau")
+                        val shareIntent = Intent.createChooser(sendIntent, shareTitle)
                         context.startActivity(shareIntent)
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(46, 204, 113))
@@ -414,7 +443,7 @@ fun ExportLuauDialog(
                     Text("Chia sẻ", color = Color.White)
                 }
                 Button(
-                    onClick = { clipboardManager.setText(AnnotatedString(luauCode)) },
+                    onClick = { clipboardManager.setText(AnnotatedString(selectedCode)) },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0, 162, 255))
                 ) {
                     Text("Copy & Close", color = Color.White)
@@ -427,6 +456,27 @@ fun ExportLuauDialog(
             }
         }
     )
+}
+
+@Composable
+private fun ExportModeButton(
+    text: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Button(
+        onClick = onClick,
+        modifier = modifier.height(32.dp),
+        contentPadding = PaddingValues(horizontal = 8.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = if (selected) Color(0, 162, 255) else Color.Transparent,
+            contentColor = if (selected) Color.White else Color(190, 196, 204)
+        ),
+        elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp, pressedElevation = 0.dp)
+    ) {
+        Text(text = text, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
