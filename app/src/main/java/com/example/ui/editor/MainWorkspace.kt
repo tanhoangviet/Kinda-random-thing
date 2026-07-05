@@ -19,6 +19,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -202,6 +203,7 @@ fun MainWorkspace(
                             .fillMaxHeight()
                         .background(themeColors.background)
                         .border(0.5.dp, Color(0xFF3D4148))
+                        .clipToBounds()
                         .pointerInput(Unit) {
                             detectTapGestures(
                                 onDoubleTap = {

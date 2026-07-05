@@ -257,10 +257,10 @@ fun RenderRobloxObject(
             if (colorStr.contains(";")) {
                 colorStr.split(";").map { part ->
                     val segments = part.split(":")
-                    val pos = segments[0].toFloat()
+                    val pos = segments[0].toFloat().coerceIn(0f, 1f)
                     val rgb = segments[1].split(",").map { it.trim().toInt() }
                     pos to Color(rgb[0], rgb[1], rgb[2]).copy(alpha = gradientAlpha)
-                }.toTypedArray()
+                }.sortedBy { it.first }.toTypedArray()
             } else {
                 val colors = colorStr.split(" to ").map { part ->
                     val rgb = part.split(",").map { it.trim().toInt() }

@@ -301,10 +301,10 @@ fun PropertiesPanel(
                     if (colorStr.contains(";")) {
                         colorStr.split(";").map { part ->
                             val segments = part.split(":")
-                            val pos = segments[0].toFloat()
+                            val pos = segments[0].toFloat().coerceIn(0f, 1f)
                             val rgb = segments[1].split(",").map { it.trim().toInt() }
                             pos to Color(rgb[0], rgb[1], rgb[2])
-                        }.toTypedArray()
+                        }.sortedBy { it.first }.toTypedArray()
                     } else {
                         val colors = colorStr.split(" to ").map { part ->
                             val rgb = part.split(",").map { it.trim().toInt() }
@@ -320,15 +320,30 @@ fun PropertiesPanel(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(28.dp)
-                            .clip(RoundedCornerShape(4.dp))
+                            .height(44.dp)
+                            .clip(RoundedCornerShape(8.dp))
                             .background(Brush.horizontalGradient(colorStops = stops))
-                            .border(1.dp, Color(60, 60, 65), RoundedCornerShape(4.dp))
+                            .border(1.dp, Color(60, 60, 65), RoundedCornerShape(8.dp))
                             .clickable { activeGradientProp = "Color" to colorStr },
                         contentAlignment = Alignment.Center
                     ) {
+                        Row(
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .padding(bottom = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            stops.forEach { (_, color) ->
+                                Box(
+                                    modifier = Modifier
+                                        .size(10.dp)
+                                        .background(color, androidx.compose.foundation.shape.CircleShape)
+                                        .border(1.dp, Color.White.copy(alpha = 0.7f), androidx.compose.foundation.shape.CircleShape)
+                                )
+                            }
+                        }
                         Text(
-                            "Edit Gradient",
+                            "Edit Gradient Wheel",
                             color = Color.White,
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,

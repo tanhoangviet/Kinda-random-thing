@@ -56,7 +56,12 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.window.Dialog
 import com.example.data.model.Color3
+import kotlin.math.PI
+import kotlin.math.atan2
+import kotlin.math.cos
 import kotlin.math.roundToInt
+import kotlin.math.sin
+import kotlin.math.sqrt
 
 // Category-based Insert Object Dialog
 @Composable
@@ -954,8 +959,23 @@ fun GradientPickerDialog(
 
                                 Divider(color = Color(50, 50, 55), thickness = 1.dp)
 
-                                // VISUAL COLOR PICKER: Hue, Saturation, Value sliders (Figma Style)
+                                // VISUAL COLOR PICKER: circular hue/saturation wheel + value sliders.
                                 Text(Locales.translate("visual_color_mixer", lang), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
+
+                                CircularColorWheel(
+                                    hue = hue,
+                                    saturation = saturation,
+                                    value = value,
+                                    onColorChange = { newHue, newSat ->
+                                        hue = newHue
+                                        saturation = newSat
+                                        val updatedColor = hsvToColor(hue, saturation, value)
+                                        updateStopColor(stops, selectedStopIndex, updatedColor) { stops = it }
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(184.dp)
+                                )
 
                                 // 1. Hue Spectrum Slider
                                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -1105,6 +1125,112 @@ fun GradientPickerDialog(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun CircularColorWheel(
+    hue: Float,
+    saturation: Float,
+    value: Float,
+    onColorChange: (Float, Float) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val hueColors = listOf(
+        Color.Red,
+        Color.Yellow,
+        Color.Green,
+        Color.Cyan,
+        Color.Blue,
+        Color.Magenta,
+        Color.Red
+    )
+
+    fun updateFromOffset(offset: Offset, width: Float, height: Float) {
+        val radius = minOf(width, height) / 2f
+        if (radius <= 0f) return
+        val center = Offset(width / 2f, height / 2f)
+        val dx = offset.x - center.x
+        val dy = offset.y - center.y
+        val distance = sqrt(dx * dx + dy * dy)
+        val nextSaturation = (distance / radius).coerceIn(0f, 1f)
+        val nextHue = ((atan2(dy, dx) * 180f / PI.toFloat()) + 360f) % 360f
+        onColorChange(nextHue, nextSaturation)
+    }
+
+    Box(
+        modifier = modifier,
+        contentAlignment = Alignment.Center
+    ) {
+        Canvas(
+            modifier = Modifier
+                .fillMaxHeight()
+                .aspectRatio(1f)
+                .pointerInput(Unit) {
+                    detectTapGestures { offset ->
+                        updateFromOffset(offset, size.width.toFloat(), size.height.toFloat())
+                    }
+                }
+                .pointerInput(Unit) {
+                    detectDragGestures { change, _ ->
+                        change.consume()
+                        updateFromOffset(change.position, size.width.toFloat(), size.height.toFloat())
+                    }
+                }
+        ) {
+            val radius = minOf(size.width, size.height) / 2f
+            val center = Offset(size.width / 2f, size.height / 2f)
+            drawCircle(
+                brush = Brush.sweepGradient(colors = hueColors, center = center),
+                radius = radius,
+                center = center
+            )
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(Color.White, Color.White.copy(alpha = 0f)),
+                    center = center,
+                    radius = radius
+                ),
+                radius = radius,
+                center = center
+            )
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.68f)),
+                    center = center,
+                    radius = radius
+                ),
+                radius = radius,
+                center = center
+            )
+            drawCircle(
+                color = Color(24, 24, 28),
+                radius = radius * 0.18f,
+                center = center
+            )
+
+            val markerAngle = (hue / 180f * PI.toFloat())
+            val markerDistance = saturation.coerceIn(0f, 1f) * radius
+            val markerCenter = Offset(
+                x = center.x + cos(markerAngle) * markerDistance,
+                y = center.y + sin(markerAngle) * markerDistance
+            )
+            drawCircle(
+                color = Color.Black.copy(alpha = 0.45f),
+                radius = 11.dp.toPx(),
+                center = markerCenter
+            )
+            drawCircle(
+                color = Color.White,
+                radius = 8.dp.toPx(),
+                center = markerCenter
+            )
+            drawCircle(
+                color = hsvToColor(hue, saturation, value),
+                radius = 6.dp.toPx(),
+                center = markerCenter
+            )
         }
     }
 }
