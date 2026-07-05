@@ -587,37 +587,38 @@ fun RenderRobloxObject(
                     contentAlignment = Alignment.Center
                 ) {
                     androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
+                        val canvasSize = this.size
                         drawRect(
                             Brush.radialGradient(
                                 colors = listOf(Color(0xFF1F4D68), Color(0xFF090B10)),
-                                center = Offset(size.width * 0.45f, size.height * 0.35f),
-                                radius = size.minDimension * 0.75f
+                                center = Offset(canvasSize.width * 0.45f, canvasSize.height * 0.35f),
+                                radius = minOf(canvasSize.width, canvasSize.height) * 0.75f
                             )
                         )
-                        val horizon = size.height * 0.68f
+                        val horizon = canvasSize.height * 0.68f
                         for (i in 0..8) {
                             val t = i / 8f
-                            val y = horizon + (size.height - horizon) * t * t
+                            val y = horizon + (canvasSize.height - horizon) * t * t
                             drawLine(
                                 color = Color(90, 170, 230, (70 * (1f - t)).roundToInt()),
                                 start = Offset(0f, y),
-                                end = Offset(size.width, y),
+                                end = Offset(canvasSize.width, y),
                                 strokeWidth = 0.7.dp.toPx()
                             )
                         }
                         for (i in -8..8) {
-                            val offset = i * size.width * 0.09f
+                            val offset = i * canvasSize.width * 0.09f
                             drawLine(
                                 color = Color(90, 170, 230, 55),
-                                start = Offset(size.width / 2f + offset * 0.2f, horizon),
-                                end = Offset(size.width / 2f + offset, size.height),
+                                start = Offset(canvasSize.width / 2f + offset * 0.2f, horizon),
+                                end = Offset(canvasSize.width / 2f + offset, canvasSize.height),
                                 strokeWidth = 0.7.dp.toPx()
                             )
                         }
                         drawCircle(
                             color = Color(0, 0, 0, 120),
-                            radius = size.minDimension * 0.22f,
-                            center = Offset(size.width / 2f, size.height * 0.72f)
+                            radius = minOf(canvasSize.width, canvasSize.height) * 0.22f,
+                            center = Offset(canvasSize.width / 2f, canvasSize.height * 0.72f)
                         )
 
                         val vertices = listOf(
