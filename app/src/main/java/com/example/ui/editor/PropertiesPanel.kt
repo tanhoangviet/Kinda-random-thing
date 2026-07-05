@@ -38,6 +38,7 @@ fun PropertiesPanel(
     onApplyAnchorPreset: (String, String) -> Unit,
     onOpenScript: (String) -> Unit = {},
     lang: String = "vi",
+    onMinimize: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     if (selectedObj == null) {
@@ -105,11 +106,27 @@ fun PropertiesPanel(
                     fontWeight = FontWeight.Bold
                 )
             }
-            Text(
-                text = selectedObj.className.name,
-                color = Color.Gray,
-                fontSize = 10.sp
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = selectedObj.className.name,
+                    color = Color.Gray,
+                    fontSize = 10.sp
+                )
+                if (onMinimize != null) {
+                    Spacer(modifier = Modifier.width(4.dp))
+                    IconButton(
+                        onClick = onMinimize,
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ChevronRight,
+                            contentDescription = "Minimize Properties",
+                            tint = Color(0xFFA6ACB3),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(6.dp))
@@ -311,9 +328,9 @@ fun PropertiesPanel(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            "Edit Gradient", 
-                            color = Color.White, 
-                            fontSize = 9.sp, 
+                            "Edit Gradient",
+                            color = Color.White,
+                            fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier
                                 .background(Color.Black.copy(0.4f), RoundedCornerShape(4.dp))
@@ -321,7 +338,7 @@ fun PropertiesPanel(
                         )
                     }
                 }
-                
+
                 if (selectedObj.properties.containsKey("Rotation")) {
                     val rotation = selectedObj.properties["Rotation"] as? Float ?: 0f
                     PropertyRow(label = "Rotation") {

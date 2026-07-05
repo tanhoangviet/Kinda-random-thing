@@ -37,12 +37,12 @@ fun MainWorkspace(
 ) {
     val configuration = LocalConfiguration.current
     val isCompact = configuration.screenWidthDp < 900 || configuration.screenHeightDp < 520
-    
+
     // ViewModel Observables
     val rootObj by viewModel.rootObject.collectAsState()
     val selectedId by viewModel.selectedObjectId.collectAsState()
     val selectedObj by viewModel.selectedObject.collectAsState()
-    
+
     val projectName by viewModel.currentProjectName.collectAsState()
     val isPreviewMode by viewModel.isPreviewMode.collectAsState()
     val showGrid by viewModel.showGrid.collectAsState()
@@ -67,10 +67,20 @@ fun MainWorkspace(
     var showCompactMenu by remember { mutableStateOf(false) }
     var generatedLuauCode by remember { mutableStateOf("") }
     var generatedRojoBundle by remember { mutableStateOf("") }
+    var explorerMinimized by remember(isCompact) { mutableStateOf(false) }
+    var propertiesMinimized by remember(isCompact) { mutableStateOf(false) }
 
     // Canvas panning/zooming state
-    val sidePanelReserve = if (!isCompact && !isPreviewMode) 560 else 0
-    val bottomReserve = if (isCompact) 76 else 28
+    val explorerPanelWidth = if (isCompact) 216.dp else 248.dp
+    val propertiesPanelWidth = if (isCompact) 256.dp else 304.dp
+    val collapsedRailWidth = 52.dp
+    val sidePanelReserve = if (!isPreviewMode) {
+        (if (explorerMinimized) 52 else if (isCompact) 216 else 248) +
+            (if (propertiesMinimized) 52 else if (isCompact) 256 else 304)
+    } else {
+        0
+    }
+    val bottomReserve = 28
     val topReserve = if (isTopbarVisible) 72 else 8
     val fitCanvasScale = min(
         ((configuration.screenWidthDp - sidePanelReserve).coerceAtLeast(320)).toFloat() / screenWidth.coerceAtLeast(1).toFloat(),
@@ -79,8 +89,6 @@ fun MainWorkspace(
     var canvasScale by remember { mutableStateOf(fitCanvasScale) }
     var canvasOffsetX by remember { mutableStateOf(0f) }
     var canvasOffsetY by remember { mutableStateOf(0f) }
-
-    var activeTabMobile by remember { mutableStateOf("Viewport") }
 
     LaunchedEffect(configuration.screenWidthDp, configuration.screenHeightDp, screenWidth, screenHeight, isCompact) {
         canvasScale = fitCanvasScale
@@ -306,23 +314,20 @@ fun MainWorkspace(
                     .weight(1f)
                     .fillMaxWidth()
             ) {
-                // 1. Left Panel (Dex Explorer hierarchy)
-                // Visible on Desktop if not in preview mode, or on Mobile if active tab is Explorer
-                if ((!isCompact && !isPreviewMode) || (isCompact && activeTabMobile == "Explorer")) {
-                    Box(
-                        modifier = Modifier
-                            .then(if (!isCompact) Modifier.width(248.dp) else Modifier.weight(1f))
-                            .fillMaxHeight()
-                    ) {
+                if (!isPreviewMode) {
+                    if (explorerMinimized) {
+                        StudioSidebarRail(
+                            iconRes = R.drawable.vanilla_action_explorer,
+                            label = "Explorer",
+                            expandIcon = Icons.Default.ChevronRight,
+                            onExpand = { explorerMinimized = false },
+                            modifier = Modifier.width(collapsedRailWidth)
+                        )
+                    } else {
                         DexExplorerPanel(
                             root = rootObj,
                             selectedId = selectedId,
-                            onSelect = { 
-                                viewModel.selectObject(it)
-                                if (isCompact) {
-                                    activeTabMobile = "Viewport"
-                                }
-                            },
+                            onSelect = { viewModel.selectObject(it) },
                             onDelete = { viewModel.deleteObject(it) },
                             onDuplicate = { viewModel.duplicateObject(it) },
                             onRename = { id, name -> viewModel.renameObject(id, name) },
@@ -330,44 +335,45 @@ fun MainWorkspace(
                             onCopy = { viewModel.copyObject(it) },
                             onPaste = { viewModel.pasteObject(it) },
                             onOpenScript = { viewModel.openScriptEditor(it) },
-                            onToggleDragMode = { viewModel.setUseSingleDragMode(!useSingleDragMode) }
+                            onToggleDragMode = { viewModel.setUseSingleDragMode(!useSingleDragMode) },
+                            onMinimize = { explorerMinimized = true },
+                            modifier = Modifier
+                                .width(explorerPanelWidth)
+                                .fillMaxHeight()
                         )
                     }
                 }
 
-                // 2. Center Workspace Area (The Viewport canvas)
-                // Always visible on Desktop, or on Mobile if active tab is Viewport
-                if (!isCompact || activeTabMobile == "Viewport") {
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                            .background(Color(0xFF191B1F))
-                            .border(0.5.dp, Color(0xFF3D4148))
-                            .pointerInput(Unit) {
-                                detectTapGestures(
-                                    onDoubleTap = {
-                                        viewModel.selectObject(null)
-                                    }
-                                )
-                            }
-                            .pointerInput(selectedId, useSingleDragMode) {
-                                detectTransformGestures { _, pan, zoom, _ ->
-                                    if (zoom != 1.0f) {
-                                        // Deselect selected object when starting zoom
-                                        viewModel.selectObject(null)
-                                    }
-                                    
-                                    // Lock camera movement if single-drag mode is activated and an object is selected
-                                    val isCameraLocked = selectedId != null && useSingleDragMode
-                                    if (!isCameraLocked) {
-                                        canvasScale = (canvasScale * zoom).coerceIn(0.2f, 3.0f)
-                                        canvasOffsetX += pan.x
-                                        canvasOffsetY += pan.y
-                                    }
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .background(Color(0xFF191B1F))
+                        .border(0.5.dp, Color(0xFF3D4148))
+                        .pointerInput(Unit) {
+                            detectTapGestures(
+                                onDoubleTap = {
+                                    viewModel.selectObject(null)
+                                }
+                            )
+                        }
+                        .pointerInput(selectedId, useSingleDragMode) {
+                            detectTransformGestures { _, pan, zoom, _ ->
+                                if (zoom != 1.0f) {
+                                    // Deselect selected object when starting zoom
+                                    viewModel.selectObject(null)
+                                }
+
+                                // Lock camera movement if single-drag mode is activated and an object is selected
+                                val isCameraLocked = selectedId != null && useSingleDragMode
+                                if (!isCameraLocked) {
+                                    canvasScale = (canvasScale * zoom).coerceIn(0.2f, 3.0f)
+                                    canvasOffsetX += pan.x
+                                    canvasOffsetY += pan.y
                                 }
                             }
-                    ) {
+                        }
+                ) {
                         // Interactive background viewport
                         Box(
                             modifier = Modifier
@@ -499,7 +505,7 @@ fun MainWorkspace(
                                 ) {
                                     Image(painterResource(R.drawable.vanilla_action_insert), contentDescription = "Insert Object", modifier = Modifier.size(24.dp))
                                 }
-                                
+
                                 VerticalDivider(modifier = Modifier.height(16.dp).padding(horizontal = 4.dp), color = Color.Gray)
 
                                 IconButton(
@@ -518,17 +524,18 @@ fun MainWorkspace(
                                 }
                             }
                         }
-                    }
                 }
 
-                // 3. Right Panel (Properties Inspector)
-                // Visible on Desktop if not in preview mode, or on Mobile if active tab is Properties
-                if ((!isCompact && !isPreviewMode) || (isCompact && activeTabMobile == "Properties")) {
-                    Box(
-                        modifier = Modifier
-                            .then(if (!isCompact) Modifier.width(304.dp) else Modifier.weight(1f))
-                            .fillMaxHeight()
-                    ) {
+                if (!isPreviewMode) {
+                    if (propertiesMinimized) {
+                        StudioSidebarRail(
+                            iconRes = R.drawable.vanilla_action_properties,
+                            label = "Properties",
+                            expandIcon = Icons.Default.ChevronLeft,
+                            onExpand = { propertiesMinimized = false },
+                            modifier = Modifier.width(collapsedRailWidth)
+                        )
+                    } else {
                         val parentName = selectedId?.let { id ->
                             findParentNameInTree(rootObj, id)
                         }
@@ -546,86 +553,24 @@ fun MainWorkspace(
                             onConvertScaleToOffset = { viewModel.convertScaleToOffset(it) },
                             onApplyAnchorPreset = { id, pr -> viewModel.applyAnchorPreset(id, pr) },
                             onOpenScript = { viewModel.openScriptEditor(it) },
-                            lang = language
+                            lang = language,
+                            onMinimize = { propertiesMinimized = true },
+                            modifier = Modifier
+                                .width(propertiesPanelWidth)
+                                .fillMaxHeight()
                         )
                     }
                 }
             }
 
-            // Bottom Navigation tabs on small screens (DPI-adaptive)
-            if (isCompact) {
-                NavigationBar(
-                    containerColor = Color(0xFF202124),
-                    tonalElevation = 8.dp,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(64.dp)
-                ) {
-                    NavigationBarItem(
-                        selected = activeTabMobile == "Explorer",
-                        onClick = { activeTabMobile = "Explorer" },
-                        icon = {
-                            Image(
-                                painter = painterResource(id = R.drawable.vanilla_action_explorer),
-                                contentDescription = "Explorer",
-                                modifier = Modifier.size(24.dp)
-                            )
-                        },
-                        label = { Text("Explorer", fontSize = 10.sp) },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedTextColor = Color(0xFF8FBFF8),
-                            indicatorColor = Color(0xFF0A84FF).copy(alpha = 0.18f),
-                            unselectedIconColor = Color.Gray,
-                            unselectedTextColor = Color(0xFFA6ACB3)
-                        )
-                    )
-                    NavigationBarItem(
-                        selected = activeTabMobile == "Viewport",
-                        onClick = { activeTabMobile = "Viewport" },
-                        icon = {
-                            Image(
-                                painter = painterResource(id = R.drawable.vanilla_action_ui),
-                                contentDescription = "Viewport",
-                                modifier = Modifier.size(24.dp)
-                            )
-                        },
-                        label = { Text("Viewport", fontSize = 10.sp) },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedTextColor = Color(0xFF8FBFF8),
-                            indicatorColor = Color(0xFF0A84FF).copy(alpha = 0.18f),
-                            unselectedIconColor = Color.Gray,
-                            unselectedTextColor = Color(0xFFA6ACB3)
-                        )
-                    )
-                    NavigationBarItem(
-                        selected = activeTabMobile == "Properties",
-                        onClick = { activeTabMobile = "Properties" },
-                        icon = {
-                            Image(
-                                painter = painterResource(id = R.drawable.vanilla_action_properties),
-                                contentDescription = "Properties",
-                                modifier = Modifier.size(24.dp)
-                            )
-                        },
-                        label = { Text("Properties", fontSize = 10.sp) },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedTextColor = Color(0xFF8FBFF8),
-                            indicatorColor = Color(0xFF0A84FF).copy(alpha = 0.18f),
-                            unselectedIconColor = Color.Gray,
-                            unselectedTextColor = Color(0xFFA6ACB3)
-                        )
-                    )
-                }
-            } else {
-                StudioStatusBar(
-                    selectedObj = selectedObj,
-                    projectName = projectName,
-                    devicePreview = devicePreview,
-                    canvasScale = canvasScale,
-                    showGrid = showGrid,
-                    snapToGrid = snapToGrid
-                )
-            }
+            StudioStatusBar(
+                selectedObj = selectedObj,
+                projectName = projectName,
+                devicePreview = devicePreview,
+                canvasScale = canvasScale,
+                showGrid = showGrid,
+                snapToGrid = snapToGrid
+            )
         }
     }
 
@@ -776,7 +721,7 @@ fun MainWorkspace(
                             )
                         )
                     }
-                    
+
                     if (snapToGrid) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -847,6 +792,44 @@ fun MainWorkspace(
         }
     }
     } // Close root Box
+}
+
+@Composable
+private fun StudioSidebarRail(
+    iconRes: Int,
+    label: String,
+    expandIcon: ImageVector,
+    onExpand: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxHeight()
+            .background(Color(0xFF25272C))
+            .border(1.dp, Color(0xFF3D4148))
+            .padding(vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        IconButton(
+            onClick = onExpand,
+            modifier = Modifier.size(48.dp)
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Image(
+                    painter = painterResource(id = iconRes),
+                    contentDescription = label,
+                    modifier = Modifier.size(22.dp)
+                )
+                Icon(
+                    imageVector = expandIcon,
+                    contentDescription = null,
+                    tint = Color(0xFFA6ACB3),
+                    modifier = Modifier.size(14.dp)
+                )
+            }
+        }
+    }
 }
 
 @Composable

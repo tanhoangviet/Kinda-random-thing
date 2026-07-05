@@ -39,15 +39,16 @@ fun DexExplorerPanel(
     onPaste: (String) -> Unit,
     onOpenScript: (String) -> Unit = {},
     onToggleDragMode: () -> Unit = {},
+    onMinimize: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var classFilter by remember { mutableStateOf<RobloxClass?>(null) }
     var showFilterDropdown by remember { mutableStateOf(false) }
-    
+
     // Track expanded state of nodes
     val expandedNodes = remember { mutableStateMapOf<String, Boolean>().apply { put(root.id, true) } }
-    
+
     // Dialogue for renaming
     var renamingId by remember { mutableStateOf<String?>(null) }
     var renameInput by remember { mutableStateOf("") }
@@ -80,36 +81,51 @@ fun DexExplorerPanel(
                     fontWeight = FontWeight.Bold
                 )
             }
-            IconButton(
-                onClick = { showFilterDropdown = true },
-                modifier = Modifier.size(36.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.FilterList,
-                    contentDescription = "Filter Classes",
-                    tint = if (classFilter != null) Color(0, 162, 255) else Color.Gray,
-                    modifier = Modifier.size(16.dp)
-                )
-                DropdownMenu(
-                    expanded = showFilterDropdown,
-                    onDismissRequest = { showFilterDropdown = false }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                    onClick = { showFilterDropdown = true },
+                    modifier = Modifier.size(36.dp)
                 ) {
-                    DropdownMenuItem(
-                        text = { Text("All Classes", fontSize = 12.sp) },
-                        onClick = { classFilter = null; showFilterDropdown = false }
+                    Icon(
+                        imageVector = Icons.Default.FilterList,
+                        contentDescription = "Filter Classes",
+                        tint = if (classFilter != null) Color(0, 162, 255) else Color.Gray,
+                        modifier = Modifier.size(16.dp)
                     )
-                    RobloxClass.values().forEach { cls ->
+                    DropdownMenu(
+                        expanded = showFilterDropdown,
+                        onDismissRequest = { showFilterDropdown = false }
+                    ) {
                         DropdownMenuItem(
-                            text = { Text(cls.name, fontSize = 12.sp) },
-                            onClick = { classFilter = cls; showFilterDropdown = false }
+                            text = { Text("All Classes", fontSize = 12.sp) },
+                            onClick = { classFilter = null; showFilterDropdown = false }
+                        )
+                        RobloxClass.values().forEach { cls ->
+                            DropdownMenuItem(
+                                text = { Text(cls.name, fontSize = 12.sp) },
+                                onClick = { classFilter = cls; showFilterDropdown = false }
+                            )
+                        }
+                    }
+                }
+                if (onMinimize != null) {
+                    IconButton(
+                        onClick = onMinimize,
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ChevronLeft,
+                            contentDescription = "Minimize Explorer",
+                            tint = Color(0xFFA6ACB3),
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                 }
             }
         }
-        
+
         Spacer(modifier = Modifier.height(6.dp))
-        
+
         // Search Input
         OutlinedTextField(
             value = searchQuery,
@@ -129,9 +145,9 @@ fun DexExplorerPanel(
             ),
             textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp)
         )
-        
+
         Spacer(modifier = Modifier.height(8.dp))
-        
+
         // Hierarchy list
         LazyColumn(
             modifier = Modifier
@@ -214,7 +230,7 @@ fun RenderExplorerNode(
     val isSelected = node.id == selectedId
     val isExpanded = expandedNodes[node.id] ?: false
     val hasChildren = node.children.isNotEmpty()
-    
+
     // Filtering logic
     val matchesSearch = searchQuery.isEmpty() || node.name.contains(searchQuery, ignoreCase = true)
     val matchesFilter = classFilter == null || node.className == classFilter

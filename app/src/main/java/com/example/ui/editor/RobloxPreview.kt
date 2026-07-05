@@ -16,8 +16,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
@@ -102,7 +104,7 @@ fun CanvasGrid(gridSize: Int, width: Int, height: Int) {
     androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
         val strokeColor = Color(50, 50, 50)
         val step = gridSize.toFloat()
-        
+
         // Horizontal lines
         var y = 0f
         while (y < size.height) {
@@ -114,7 +116,7 @@ fun CanvasGrid(gridSize: Int, width: Int, height: Int) {
             )
             y += step
         }
-        
+
         // Vertical lines
         var x = 0f
         while (x < size.width) {
@@ -153,7 +155,7 @@ fun RenderRobloxObject(
     // Position and size extraction (UDim2)
     val pos = obj.properties["Position"] as? UDim2 ?: UDim2(0f, 0, 0f, 0)
     val size = obj.properties["Size"] as? UDim2 ?: UDim2(0.2f, 0, 0.2f, 0)
-    
+
     // Remember updated states to avoid capturing stale values in pointerInput
     val currentPos by rememberUpdatedState(pos)
     val currentSize by rememberUpdatedState(size)
@@ -164,9 +166,28 @@ fun RenderRobloxObject(
     val currentParentH by rememberUpdatedState(parentH)
     val anchor = obj.properties["AnchorPoint"] as? Vector2 ?: Vector2(0f, 0f)
 
-    // Compute absolute pixel bounds
-    val wPx = (size.scaleX * parentW) + size.offsetX
-    val hPx = (size.scaleY * parentH) + size.offsetY
+    // Compute absolute pixel bounds, then apply supported constraints.
+    val rawWPx = (size.scaleX * parentW) + size.offsetX
+    val rawHPx = (size.scaleY * parentH) + size.offsetY
+    val aspectChild = obj.children.firstOrNull { it.className == RobloxClass.UIAspectRatioConstraint }
+    val constrainedSize = if (aspectChild != null) {
+        val ratio = (aspectChild.properties["AspectRatio"] as? Float ?: 1f).coerceAtLeast(0.01f)
+        val dominantAxis = aspectChild.properties["DominantAxis"] as? String ?: "Width"
+        when (dominantAxis) {
+            "Height" -> (rawHPx * ratio) to rawHPx
+            "Width" -> rawWPx to (rawWPx / ratio)
+            else -> {
+                val currentRatio = rawWPx / rawHPx.coerceAtLeast(1f)
+                if (currentRatio > ratio) (rawHPx * ratio) to rawHPx else rawWPx to (rawWPx / ratio)
+            }
+        }
+    } else {
+        rawWPx to rawHPx
+    }
+    val wPx = constrainedSize.first.coerceAtLeast(1f)
+    val hPx = constrainedSize.second.coerceAtLeast(1f)
+    val uiScale = ((obj.children.firstOrNull { it.className == RobloxClass.UIScale }?.properties?.get("Scale") as? Float) ?: 1f)
+        .coerceIn(0.05f, 10f)
 
     val xPx = (pos.scaleX * parentW) + pos.offsetX - (anchor.x * wPx)
     val yPx = (pos.scaleY * parentH) + pos.offsetY - (anchor.y * hPx)
@@ -187,7 +208,7 @@ fun RenderRobloxObject(
         val topRight = cornerChild.properties["TopRight"] as? UDim2 ?: r
         val bottomLeft = cornerChild.properties["BottomLeft"] as? UDim2 ?: r
         val bottomRight = cornerChild.properties["BottomRight"] as? UDim2 ?: r
-        
+
         RoundedCornerShape(
             topStart = topLeft.offsetX.dp,
             topEnd = topRight.offsetX.dp,
@@ -203,19 +224,20 @@ fun RenderRobloxObject(
     val backgroundModifier = if (gradientChild != null) {
         val colorStr = gradientChild.properties["Color"] as? String ?: "255,255,255 to 150,150,150"
         val rotation = (gradientChild.properties["Rotation"] as? Float ?: 0f) % 360f
-        
+        val gradientAlpha = (1f - (gradientChild.properties["Transparency"] as? Float ?: 0f)).coerceIn(0f, 1f)
+
         val colorStops = try {
             if (colorStr.contains(";")) {
                 colorStr.split(";").map { part ->
                     val segments = part.split(":")
                     val pos = segments[0].toFloat()
                     val rgb = segments[1].split(",").map { it.trim().toInt() }
-                    pos to Color(rgb[0], rgb[1], rgb[2])
+                    pos to Color(rgb[0], rgb[1], rgb[2]).copy(alpha = gradientAlpha)
                 }.toTypedArray()
             } else {
                 val colors = colorStr.split(" to ").map { part ->
                     val rgb = part.split(",").map { it.trim().toInt() }
-                    Color(rgb[0], rgb[1], rgb[2])
+                    Color(rgb[0], rgb[1], rgb[2]).copy(alpha = gradientAlpha)
                 }
                 arrayOf(0f to colors[0], 1f to colors[1])
             }
@@ -248,7 +270,8 @@ fun RenderRobloxObject(
     val borderModifier = if (strokeChild != null) {
         val col = strokeChild.properties["Color"] as? Color3 ?: Color3(0, 0, 0)
         val thick = strokeChild.properties["Thickness"] as? Int ?: 1
-        Modifier.border(thick.dp, Color(col.r, col.g, col.b), shape)
+        val alpha = (1f - (strokeChild.properties["Transparency"] as? Float ?: 0f)).coerceIn(0f, 1f)
+        Modifier.border(thick.dp, Color(col.r, col.g, col.b).copy(alpha = alpha), shape)
     } else {
         val bSize = obj.properties["BorderSizePixel"] as? Int ?: 1
         if (bSize > 0) {
@@ -265,14 +288,19 @@ fun RenderRobloxObject(
         if (shadowEnabled) {
             val shadowColorRaw = shadowChild.properties["Color"] as? Color3 ?: Color3(0, 0, 0)
             val shadowTrans = shadowChild.properties["Transparency"] as? Float ?: 0.5f
+            val shadowBlur = (shadowChild.properties["Blur"] as? Int ?: 8).coerceAtLeast(0)
+            val shadowSpread = (shadowChild.properties["Spread"] as? Int ?: 0)
             val shadowOffset = shadowChild.properties["Offset"] as? Vector2 ?: Vector2(0f, 4f)
             val shadowColor = Color(shadowColorRaw.r, shadowColorRaw.g, shadowColorRaw.b).copy(alpha = (1.0f - shadowTrans).coerceIn(0f, 1f))
-            
+            val shadowW = (wPx + shadowSpread * 2).coerceAtLeast(1f)
+            val shadowH = (hPx + shadowSpread * 2).coerceAtLeast(1f)
+
             Box(
                 modifier = Modifier
-                    .offset((xPx + shadowOffset.x).dp, (yPx + shadowOffset.y).dp)
-                    .size(wPx.dp, hPx.dp)
+                    .offset((xPx + shadowOffset.x - shadowSpread).dp, (yPx + shadowOffset.y - shadowSpread).dp)
+                    .size(shadowW.dp, shadowH.dp)
                     .background(shadowColor, shape)
+                    .blur(shadowBlur.dp)
             )
         }
     }
@@ -281,6 +309,7 @@ fun RenderRobloxObject(
         modifier = Modifier
             .offset(xPx.dp, yPx.dp)
             .size(wPx.dp, hPx.dp)
+            .graphicsLayer(scaleX = uiScale, scaleY = uiScale)
             .clip(shape)
             .then(backgroundModifier)
             .then(borderModifier)
@@ -308,21 +337,21 @@ fun RenderRobloxObject(
                                 change.consume()
                                 val dxDp = dragAmount.x / (density * currentScaleFactor)
                                 val dyDp = dragAmount.y / (density * currentScaleFactor)
-                                
+
                                 dragAccumulatedX += dxDp
                                 dragAccumulatedY += dyDp
-                                
+
                                 val newOffsetX = startPos.offsetX + dragAccumulatedX
                                 val newOffsetY = startPos.offsetY + dragAccumulatedY
-                                
+
                                 val finalX = if (currentSnapToGrid && currentGridSize > 1) {
                                     (newOffsetX.roundToInt() / currentGridSize) * currentGridSize
                                 } else newOffsetX.roundToInt()
-                                
+
                                 val finalY = if (currentSnapToGrid && currentGridSize > 1) {
                                     (newOffsetY.roundToInt() / currentGridSize) * currentGridSize
                                 } else newOffsetY.roundToInt()
-                                
+
                                 if (finalX != currentPos.offsetX || finalY != currentPos.offsetY) {
                                     onMoveOrResize(
                                         obj.id,
@@ -342,7 +371,7 @@ fun RenderRobloxObject(
                                 val newOffsetY = (currentSize.offsetY * zoom).roundToInt()
                                 val newScaleX = (currentSize.scaleX * zoom).coerceIn(0f, 10f)
                                 val newScaleY = (currentSize.scaleY * zoom).coerceIn(0f, 10f)
-                                
+
                                 val updatedSize = currentSize.copy(
                                     scaleX = if (currentSize.scaleX > 0f) newScaleX else 0f,
                                     offsetX = if (currentSize.scaleX == 0f) newOffsetX.coerceAtLeast(10) else currentSize.offsetX,
@@ -354,25 +383,25 @@ fun RenderRobloxObject(
                                 // 1-finger hold and drag to move
                                 val dxDp = pan.x / (density * currentScaleFactor)
                                 val dyDp = pan.y / (density * currentScaleFactor)
-                                
+
                                 val currentX = currentPos.offsetX.toFloat()
                                 val currentY = currentPos.offsetY.toFloat()
                                 if (kotlin.math.abs(dragStartX - currentX) > 30f || kotlin.math.abs(dragStartY - currentY) > 30f) {
                                     dragStartX = currentX
                                     dragStartY = currentY
                                 }
-                                
+
                                 dragStartX += dxDp
                                 dragStartY += dyDp
-                                
+
                                 val finalX = if (currentSnapToGrid && currentGridSize > 1) {
                                     (dragStartX.roundToInt() / currentGridSize) * currentGridSize
                                 } else dragStartX.roundToInt()
-                                
+
                                 val finalY = if (currentSnapToGrid && currentGridSize > 1) {
                                     (dragStartY.roundToInt() / currentGridSize) * currentGridSize
                                 } else dragStartY.roundToInt()
-                                
+
                                 if (finalX != currentPos.offsetX || finalY != currentPos.offsetY) {
                                     onMoveOrResize(
                                         obj.id,
@@ -391,14 +420,16 @@ fun RenderRobloxObject(
             RobloxClass.TextLabel, RobloxClass.TextButton -> {
                 val text = obj.properties["Text"] as? String ?: "Text"
                 val textColorRaw = obj.properties["TextColor3"] as? Color3 ?: Color3(255, 255, 255)
+                val textTrans = obj.properties["TextTransparency"] as? Float ?: 0f
                 val textColor = Color(textColorRaw.r, textColorRaw.g, textColorRaw.b)
+                    .copy(alpha = (1f - textTrans).coerceIn(0f, 1f))
                 val textSize = obj.properties["TextSize"] as? Int ?: 14
                 val textScaled = obj.properties["TextScaled"] as? Boolean ?: false
                 val wrapped = obj.properties["TextWrapped"] as? Boolean ?: true
                 val font = obj.properties["Font"] as? String ?: "SourceSans"
                 val textXAlign = obj.properties["TextXAlignment"] as? String ?: "Center"
                 val textYAlign = obj.properties["TextYAlignment"] as? String ?: "Center"
-                
+
                 val align = when (textXAlign) {
                     "Left" -> TextAlign.Left
                     "Right" -> TextAlign.Right
@@ -421,7 +452,7 @@ fun RenderRobloxObject(
                         else -> Alignment.Center
                     }
                 }
-                
+
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -431,7 +462,7 @@ fun RenderRobloxObject(
                     Text(
                         text = text,
                         color = textColor,
-                        fontSize = if (textScaled) (hPx * 0.6f).sp else textSize.sp,
+                        fontSize = if (textScaled) (hPx * 0.45f).coerceIn(8f, 72f).sp else textSize.sp,
                         textAlign = align,
                         fontWeight = if (font.contains("Bold")) FontWeight.Bold else FontWeight.Normal,
                         fontStyle = if (font.contains("Italic")) FontStyle.Italic else FontStyle.Normal,
@@ -443,11 +474,13 @@ fun RenderRobloxObject(
             }
             RobloxClass.ImageLabel, RobloxClass.ImageButton -> {
                 val image = obj.properties["Image"] as? String ?: "rbxassetid://0"
-                
+                val imageAlpha = (1f - (obj.properties["ImageTransparency"] as? Float ?: 0f)).coerceIn(0f, 1f)
+
                 // Draw a simple Roblox placeholder visual inside the image box
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
+                        .graphicsLayer(alpha = imageAlpha)
                         .background(Color(0, 0, 0, 50)),
                     contentAlignment = Alignment.Center
                 ) {
@@ -462,11 +495,12 @@ fun RenderRobloxObject(
                 }
             }
             RobloxClass.ScrollingFrame -> {
+                val scrollBarThickness = (obj.properties["ScrollBarThickness"] as? Int ?: 6).coerceIn(0, 24)
                 // Show a fake scroll handle on the right edge
                 Box(
                     modifier = Modifier
                         .fillMaxHeight()
-                        .width(6.dp)
+                        .width(scrollBarThickness.dp)
                         .background(Color(0, 0, 0, 80))
                         .align(Alignment.CenterEnd)
                 ) {
@@ -552,7 +586,7 @@ fun RenderRobloxObject(
                             val scale = (distance / (distance + z2)) * (this.size.width * 0.3f)
                             val screenX = this.size.width / 2 + x1 * scale
                             val screenY = this.size.height / 2 - y2 * scale
-                            
+
                             Pair(Offset(screenX, screenY), z2)
                         }
 
@@ -618,7 +652,16 @@ fun RenderRobloxObject(
             RobloxClass.UIListLayout,
             RobloxClass.UIGridLayout
         )
-        val childrenToRender = obj.children.filter { it.className !in nonRenderableClasses }
+        val childrenToRender = obj.children
+            .filter { it.className !in nonRenderableClasses }
+            .sortedWith(compareBy<RobloxObject> { it.properties["LayoutOrder"] as? Int ?: 0 }.thenBy { it.name })
+        val contentPadding = resolveRenderPadding(
+            paddingChild = obj.children.firstOrNull { it.className == RobloxClass.UIPadding },
+            parentW = wPx,
+            parentH = hPx
+        )
+        val paddedW = (wPx - contentPadding.left - contentPadding.right).coerceAtLeast(1f)
+        val paddedH = (hPx - contentPadding.top - contentPadding.bottom).coerceAtLeast(1f)
 
         // If it is a list or grid layout, we can stack them!
         val listLayout = obj.children.firstOrNull { it.className == RobloxClass.UIListLayout }
@@ -626,18 +669,25 @@ fun RenderRobloxObject(
         if (listLayout != null && childrenToRender.isNotEmpty()) {
             val isVertical = (listLayout.properties["FillDirection"] as? String ?: "Vertical") == "Vertical"
             val spacing = (listLayout.properties["Padding"] as? UDim2)?.offsetY ?: 8
-            
+            val horizontalAlignment = toHorizontalAlignment(listLayout.properties["HorizontalAlignment"] as? String ?: "Center")
+            val verticalAlignment = toVerticalAlignment(listLayout.properties["VerticalAlignment"] as? String ?: "Center")
+
             if (isVertical) {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(4.dp),
+                        .padding(
+                            start = contentPadding.left.dp,
+                            top = contentPadding.top.dp,
+                            end = contentPadding.right.dp,
+                            bottom = contentPadding.bottom.dp
+                        ),
                     verticalArrangement = Arrangement.spacedBy(spacing.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                    horizontalAlignment = horizontalAlignment
                 ) {
                     childrenToRender.forEach { child ->
                         Box(modifier = Modifier.wrapContentSize()) {
-                            RenderLayoutChild(child, wPx - 8f, hPx - 8f)
+                            RenderLayoutChild(child, paddedW, paddedH)
                         }
                     }
                 }
@@ -645,13 +695,18 @@ fun RenderRobloxObject(
                 Row(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(4.dp),
+                        .padding(
+                            start = contentPadding.left.dp,
+                            top = contentPadding.top.dp,
+                            end = contentPadding.right.dp,
+                            bottom = contentPadding.bottom.dp
+                        ),
                     horizontalArrangement = Arrangement.spacedBy(spacing.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = verticalAlignment
                 ) {
                     childrenToRender.forEach { child ->
                         Box(modifier = Modifier.wrapContentSize()) {
-                            RenderLayoutChild(child, wPx - 8f, hPx - 8f)
+                            RenderLayoutChild(child, paddedW, paddedH)
                         }
                     }
                 }
@@ -667,7 +722,12 @@ fun RenderRobloxObject(
             FlowRow(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(4.dp),
+                    .padding(
+                        start = contentPadding.left.dp,
+                        top = contentPadding.top.dp,
+                        end = contentPadding.right.dp,
+                        bottom = contentPadding.bottom.dp
+                    ),
                 horizontalArrangement = Arrangement.spacedBy(gapX.dp),
                 verticalArrangement = Arrangement.spacedBy(gapY.dp)
             ) {
@@ -729,26 +789,26 @@ fun RenderRobloxObject(
                                         change.consume()
                                         val dxDp = dragAmount.x / (density * currentScaleFactor)
                                         val dyDp = dragAmount.y / (density * currentScaleFactor)
-                                        
+
                                         dragAccumulatedX += dxDp
                                         dragAccumulatedY += dyDp
-                                        
+
                                         val newW = startSize.offsetX - dragAccumulatedX
                                         val newH = startSize.offsetY - dragAccumulatedY
-                                        
+
                                         val finalW = if (currentSnapToGrid && currentGridSize > 1) (newW.roundToInt() / currentGridSize) * currentGridSize else newW.roundToInt()
                                         val finalH = if (currentSnapToGrid && currentGridSize > 1) (newH.roundToInt() / currentGridSize) * currentGridSize else newH.roundToInt()
-                                        
+
                                         val minOffsetX = (10 - (startSize.scaleX * currentParentW)).toInt()
                                         val minOffsetY = (10 - (startSize.scaleY * currentParentH)).toInt()
                                         val safeW = finalW.coerceAtLeast(minOffsetX)
                                         val safeH = finalH.coerceAtLeast(minOffsetY)
-                                        
+
                                         val diffX = startSize.offsetX - safeW
                                         val adjustedX = startPos.offsetX + diffX
                                         val diffY = startSize.offsetY - safeH
                                         val adjustedY = startPos.offsetY + diffY
-                                        
+
                                         onMoveOrResize(
                                             obj.id,
                                             currentPos.copy(offsetX = adjustedX, offsetY = adjustedY),
@@ -788,24 +848,24 @@ fun RenderRobloxObject(
                                         change.consume()
                                         val dxDp = dragAmount.x / (density * currentScaleFactor)
                                         val dyDp = dragAmount.y / (density * currentScaleFactor)
-                                        
+
                                         dragAccumulatedX += dxDp
                                         dragAccumulatedY += dyDp
-                                        
+
                                         val newW = startSize.offsetX + dragAccumulatedX
                                         val newH = startSize.offsetY - dragAccumulatedY
-                                        
+
                                         val finalW = if (currentSnapToGrid && currentGridSize > 1) (newW.roundToInt() / currentGridSize) * currentGridSize else newW.roundToInt()
                                         val finalH = if (currentSnapToGrid && currentGridSize > 1) (newH.roundToInt() / currentGridSize) * currentGridSize else newH.roundToInt()
-                                        
+
                                         val minOffsetX = (10 - (startSize.scaleX * currentParentW)).toInt()
                                         val minOffsetY = (10 - (startSize.scaleY * currentParentH)).toInt()
                                         val safeW = finalW.coerceAtLeast(minOffsetX)
                                         val safeH = finalH.coerceAtLeast(minOffsetY)
-                                        
+
                                         val diffY = startSize.offsetY - safeH
                                         val adjustedY = startPos.offsetY + diffY
-                                        
+
                                         onMoveOrResize(
                                             obj.id,
                                             currentPos.copy(offsetY = adjustedY),
@@ -845,24 +905,24 @@ fun RenderRobloxObject(
                                         change.consume()
                                         val dxDp = dragAmount.x / (density * currentScaleFactor)
                                         val dyDp = dragAmount.y / (density * currentScaleFactor)
-                                        
+
                                         dragAccumulatedX += dxDp
                                         dragAccumulatedY += dyDp
-                                        
+
                                         val newW = startSize.offsetX - dragAccumulatedX
                                         val newH = startSize.offsetY + dragAccumulatedY
-                                        
+
                                         val finalW = if (currentSnapToGrid && currentGridSize > 1) (newW.roundToInt() / currentGridSize) * currentGridSize else newW.roundToInt()
                                         val finalH = if (currentSnapToGrid && currentGridSize > 1) (newH.roundToInt() / currentGridSize) * currentGridSize else newH.roundToInt()
-                                        
+
                                         val minOffsetX = (10 - (startSize.scaleX * currentParentW)).toInt()
                                         val minOffsetY = (10 - (startSize.scaleY * currentParentH)).toInt()
                                         val safeW = finalW.coerceAtLeast(minOffsetX)
                                         val safeH = finalH.coerceAtLeast(minOffsetY)
-                                        
+
                                         val diffX = startSize.offsetX - safeW
                                         val adjustedX = startPos.offsetX + diffX
-                                        
+
                                         onMoveOrResize(
                                             obj.id,
                                             currentPos.copy(offsetX = adjustedX),
@@ -900,26 +960,26 @@ fun RenderRobloxObject(
                                         change.consume()
                                         val dxDp = dragAmount.x / (density * currentScaleFactor)
                                         val dyDp = dragAmount.y / (density * currentScaleFactor)
-                                        
+
                                         dragAccumulatedX += dxDp
                                         dragAccumulatedY += dyDp
-                                        
+
                                         val newW = startSize.offsetX + dragAccumulatedX
                                         val newH = startSize.offsetY + dragAccumulatedY
-                                        
+
                                         val finalW = if (currentSnapToGrid && currentGridSize > 1) {
                                             (newW.roundToInt() / currentGridSize) * currentGridSize
                                         } else newW.roundToInt()
-                                        
+
                                         val finalH = if (currentSnapToGrid && currentGridSize > 1) {
                                             (newH.roundToInt() / currentGridSize) * currentGridSize
                                         } else newH.roundToInt()
-                                        
+
                                         val minOffsetX = (10 - (startSize.scaleX * currentParentW)).toInt()
                                         val minOffsetY = (10 - (startSize.scaleY * currentParentH)).toInt()
                                         val safeW = finalW.coerceAtLeast(minOffsetX)
                                         val safeH = finalH.coerceAtLeast(minOffsetY)
-                                        
+
                                         if (safeW != currentSize.offsetX || safeH != currentSize.offsetY) {
                                             onMoveOrResize(
                                                 obj.id,
@@ -960,26 +1020,26 @@ fun RenderRobloxObject(
                                         change.consume()
                                         val dxDp = dragAmount.x / (density * currentScaleFactor)
                                         val dyDp = dragAmount.y / (density * currentScaleFactor)
-                                        
+
                                         dragAccumulatedX += dxDp
                                         dragAccumulatedY += dyDp
-                                        
+
                                         val newW = startSize.offsetX + dragAccumulatedX
                                         val newH = startSize.offsetY + dragAccumulatedY
-                                        
+
                                         val finalW = if (currentSnapToGrid && currentGridSize > 1) {
                                             (newW.roundToInt() / currentGridSize) * currentGridSize
                                         } else newW.roundToInt()
-                                        
+
                                         val finalH = if (currentSnapToGrid && currentGridSize > 1) {
                                             (newH.roundToInt() / currentGridSize) * currentGridSize
                                         } else newH.roundToInt()
-                                        
+
                                         val minOffsetX = (10 - (startSize.scaleX * currentParentW)).toInt()
                                         val minOffsetY = (10 - (startSize.scaleY * currentParentH)).toInt()
                                         val safeW = finalW.coerceAtLeast(minOffsetX)
                                         val safeH = finalH.coerceAtLeast(minOffsetY)
-                                        
+
                                         if (safeW != currentSize.offsetX || safeH != currentSize.offsetY) {
                                             onMoveOrResize(
                                                 obj.id,
@@ -1011,6 +1071,47 @@ fun RenderRobloxObject(
     }
 }
 
+private data class RenderPadding(
+    val left: Float,
+    val top: Float,
+    val right: Float,
+    val bottom: Float
+)
+
+private fun resolveRenderPadding(
+    paddingChild: RobloxObject?,
+    parentW: Float,
+    parentH: Float
+): RenderPadding {
+    val properties = paddingChild?.properties ?: return RenderPadding(4f, 4f, 4f, 4f)
+    val top = (properties["PaddingTop"] as? UDim2)?.let { (it.scaleY * parentH) + it.offsetY } ?: 0f
+    val bottom = (properties["PaddingBottom"] as? UDim2)?.let { (it.scaleY * parentH) + it.offsetY } ?: 0f
+    val left = (properties["PaddingLeft"] as? UDim2)?.let { (it.scaleX * parentW) + it.offsetX } ?: 0f
+    val right = (properties["PaddingRight"] as? UDim2)?.let { (it.scaleX * parentW) + it.offsetX } ?: 0f
+    return RenderPadding(
+        left = left.coerceAtLeast(0f),
+        top = top.coerceAtLeast(0f),
+        right = right.coerceAtLeast(0f),
+        bottom = bottom.coerceAtLeast(0f)
+    )
+}
+
+private fun toHorizontalAlignment(value: String): Alignment.Horizontal {
+    return when (value) {
+        "Right" -> Alignment.End
+        "Center" -> Alignment.CenterHorizontally
+        else -> Alignment.Start
+    }
+}
+
+private fun toVerticalAlignment(value: String): Alignment.Vertical {
+    return when (value) {
+        "Bottom" -> Alignment.Bottom
+        "Center" -> Alignment.CenterVertically
+        else -> Alignment.Top
+    }
+}
+
 @Composable
 fun RenderLayoutChild(
     obj: RobloxObject,
@@ -1021,7 +1122,23 @@ fun RenderLayoutChild(
     val bgTrans = obj.properties["BackgroundTransparency"] as? Float ?: 0f
     val bgRaw = obj.properties["BackgroundColor3"] as? Color3 ?: Color3(163, 162, 165)
     val bgColor = Color(bgRaw.r, bgRaw.g, bgRaw.b).copy(alpha = (1.0f - bgTrans).coerceIn(0f, 1f))
-    
+    val cornerChild = obj.children.firstOrNull { it.className == RobloxClass.UICorner }
+    val shape = if (cornerChild != null) {
+        val radius = cornerChild.properties["CornerRadius"] as? UDim2 ?: UDim2(0f, 4, 0f, 4)
+        RoundedCornerShape(radius.offsetX.dp)
+    } else {
+        RoundedCornerShape(4.dp)
+    }
+    val strokeChild = obj.children.firstOrNull { it.className == RobloxClass.UIStroke }
+    val borderModifier = if (strokeChild != null) {
+        val col = strokeChild.properties["Color"] as? Color3 ?: Color3(255, 255, 255)
+        val thick = strokeChild.properties["Thickness"] as? Int ?: 1
+        val alpha = (1f - (strokeChild.properties["Transparency"] as? Float ?: 0f)).coerceIn(0f, 1f)
+        Modifier.border(thick.dp, Color(col.r, col.g, col.b).copy(alpha = alpha), shape)
+    } else {
+        Modifier
+    }
+
     val size = obj.properties["Size"] as? UDim2 ?: UDim2(0.8f, 0, 0.2f, 0)
     val w = if (fillParent) parentW.dp else ((size.scaleX * parentW) + size.offsetX).dp.coerceAtLeast(30.dp)
     val h = if (fillParent) parentH.dp else ((size.scaleY * parentH) + size.offsetY).dp.coerceAtLeast(15.dp)
@@ -1029,14 +1146,19 @@ fun RenderLayoutChild(
     Box(
         modifier = Modifier
             .size(w, h)
-            .background(bgColor, RoundedCornerShape(4.dp)),
+            .clip(shape)
+            .background(bgColor, shape)
+            .then(borderModifier),
         contentAlignment = Alignment.Center
     ) {
         when (obj.className) {
             RobloxClass.TextLabel, RobloxClass.TextButton -> {
+                val textColorRaw = obj.properties["TextColor3"] as? Color3 ?: Color3(255, 255, 255)
+                val textTrans = obj.properties["TextTransparency"] as? Float ?: 0f
                 Text(
                     text = obj.properties["Text"] as? String ?: obj.name,
-                    color = Color.White,
+                    color = Color(textColorRaw.r, textColorRaw.g, textColorRaw.b)
+                        .copy(alpha = (1f - textTrans).coerceIn(0f, 1f)),
                     fontSize = 10.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
