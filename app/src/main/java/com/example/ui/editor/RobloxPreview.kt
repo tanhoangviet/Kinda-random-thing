@@ -29,6 +29,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -40,6 +41,7 @@ import kotlin.math.sin
 import kotlin.math.PI
 import kotlin.math.roundToInt
 import com.example.data.model.*
+import coil.compose.AsyncImage
 
 @Composable
 fun RobloxCanvasPreview(
@@ -502,21 +504,32 @@ fun RenderRobloxObject(
             RobloxClass.ImageLabel, RobloxClass.ImageButton -> {
                 val image = obj.properties["Image"] as? String ?: "rbxassetid://0"
                 val imageAlpha = (1f - (obj.properties["ImageTransparency"] as? Float ?: 0f)).coerceIn(0f, 1f)
+                val scaleType = obj.properties["ScaleType"] as? String ?: "Stretch"
+                val previewModel = remember(image) { resolveRobloxImagePreviewUrl(image) }
 
-                // Draw a simple Roblox placeholder visual inside the image box
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .graphicsLayer(alpha = imageAlpha)
-                        .background(Color(0, 0, 0, 50)),
+                        .background(Color(0, 0, 0, 35)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("🏞️", fontSize = 16.sp)
-                        Text(
-                            text = image.replace("rbxassetid://", "Asset "),
-                            fontSize = 8.sp,
-                            color = Color.White.copy(alpha = 0.6f)
+                    if (previewModel != null) {
+                        AsyncImage(
+                            model = previewModel,
+                            contentDescription = null,
+                            contentScale = when (scaleType) {
+                                "Fit" -> ContentScale.Fit
+                                "Crop" -> ContentScale.Crop
+                                else -> ContentScale.FillBounds
+                            },
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .border(1.dp, Color.White.copy(alpha = 0.08f))
                         )
                     }
                 }
@@ -681,21 +694,6 @@ fun RenderRobloxObject(
                         }
                     }
 
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .padding(6.dp)
-                            .background(Color(0, 162, 255, 40), RoundedCornerShape(3.dp))
-                            .border(0.5.dp, Color(0, 162, 255, 120), RoundedCornerShape(3.dp))
-                            .padding(horizontal = 5.dp, vertical = 2.dp)
-                    ) {
-                        Text(
-                            text = "3D Viewport",
-                            fontSize = 8.sp,
-                            color = Color(150, 220, 255),
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
                 }
             }
             else -> {}
@@ -1114,23 +1112,30 @@ fun RenderRobloxObject(
                             }
                     )
                 }
-                // Top-Left Name label overlay
-                Box(
-                    modifier = Modifier
-                        .offset(0.dp, (-14).dp)
-                        .background(Color(0, 162, 255))
-                        .padding(horizontal = 4.dp, vertical = 1.dp)
-                ) {
-                    Text(
-                        text = "${obj.name} (${wPx.toInt()}x${hPx.toInt()})",
-                        color = Color.White,
-                        fontSize = 8.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
             }
         }
     }
+}
+
+private fun resolveRobloxImagePreviewUrl(image: String): String? {
+    val trimmed = image.trim()
+    if (trimmed.isBlank() || trimmed == "rbxassetid://0") return null
+    if (trimmed.startsWith("http://", ignoreCase = true) || trimmed.startsWith("https://", ignoreCase = true)) {
+        return trimmed
+    }
+
+    val assetId = listOf(
+        Regex("""rbxassetid://(\d+)""", RegexOption.IGNORE_CASE),
+        Regex("""assetId=(\d+)""", RegexOption.IGNORE_CASE),
+        Regex("""/library/(\d+)""", RegexOption.IGNORE_CASE),
+        Regex("""id=(\d+)""", RegexOption.IGNORE_CASE)
+    ).firstNotNullOfOrNull { regex ->
+        regex.find(trimmed)?.groupValues?.getOrNull(1)
+    }
+
+    return assetId
+        ?.takeIf { it != "0" }
+        ?.let { "https://www.roblox.com/asset-thumbnail/image?assetId=$it&width=420&height=420&format=png" }
 }
 
 private data class RenderPadding(

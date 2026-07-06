@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -17,7 +18,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -37,6 +44,8 @@ fun DexExplorerPanel(
     onMove: (String, Boolean) -> Unit, // (id, up)
     onCopy: (String) -> Unit,
     onPaste: (String) -> Unit,
+    onReparent: (String, String) -> Unit = { _, _ -> },
+    onInsertChild: (String, RobloxClass) -> Unit = { _, _ -> },
     onOpenScript: (String) -> Unit = {},
     onToggleDragMode: () -> Unit = {},
     onMinimize: (() -> Unit)? = null,
@@ -45,6 +54,11 @@ fun DexExplorerPanel(
     var searchQuery by remember { mutableStateOf("") }
     var classFilter by remember { mutableStateOf<RobloxClass?>(null) }
     var showFilterDropdown by remember { mutableStateOf(false) }
+    var toolbarNodeId by remember { mutableStateOf<String?>(null) }
+    var draggingNodeId by remember { mutableStateOf<String?>(null) }
+    var dragPosition by remember { mutableStateOf<Offset?>(null) }
+    var dropTargetId by remember { mutableStateOf<String?>(null) }
+    val rowBounds = remember { mutableStateMapOf<String, Rect>() }
 
     // Track expanded state of nodes
     val expandedNodes = remember { mutableStateMapOf<String, Boolean>().apply { put(root.id, true) } }
@@ -166,11 +180,53 @@ fun DexExplorerPanel(
                     onMove = onMove,
                     onCopy = onCopy,
                     onPaste = onPaste,
+                    onReparent = onReparent,
+                    onInsertChild = onInsertChild,
                     onOpenScript = onOpenScript,
                     expandedNodes = expandedNodes,
                     searchQuery = searchQuery,
                     classFilter = classFilter,
-                    onToggleDragMode = onToggleDragMode
+                    onToggleDragMode = onToggleDragMode,
+                    toolbarNodeId = toolbarNodeId,
+                    onToolbarNodeChange = { toolbarNodeId = it },
+                    draggingNodeId = draggingNodeId,
+                    dropTargetId = dropTargetId,
+                    rowBounds = rowBounds,
+                    onDragStart = { id ->
+                        draggingNodeId = id
+                        toolbarNodeId = id
+                        dropTargetId = null
+                    },
+                    onDragPosition = { id, position ->
+                        dragPosition = position
+                        dropTargetId = rowBounds.entries
+                            .firstOrNull { (targetId, bounds) ->
+                                targetId != id && bounds.containsPoint(position)
+                            }
+                            ?.key
+                    },
+                    onDragEnd = {
+                        val sourceId = draggingNodeId
+                        val targetId = dropTargetId ?: dragPosition?.let { position ->
+                            rowBounds.entries
+                                .firstOrNull { (candidateId, bounds) ->
+                                    candidateId != sourceId && bounds.containsPoint(position)
+                                }
+                                ?.key
+                        }
+                        if (sourceId != null && targetId != null) {
+                            expandedNodes[targetId] = true
+                            onReparent(sourceId, targetId)
+                        }
+                        draggingNodeId = null
+                        dragPosition = null
+                        dropTargetId = null
+                    },
+                    onDragCancel = {
+                        draggingNodeId = null
+                        dragPosition = null
+                        dropTargetId = null
+                    }
                 )
             }
         }
@@ -209,6 +265,10 @@ fun DexExplorerPanel(
     }
 }
 
+private fun Rect.containsPoint(offset: Offset): Boolean {
+    return offset.x >= left && offset.x <= right && offset.y >= top && offset.y <= bottom
+}
+
 @Composable
 fun RenderExplorerNode(
     node: RobloxObject,
@@ -221,11 +281,22 @@ fun RenderExplorerNode(
     onMove: (String, Boolean) -> Unit,
     onCopy: (String) -> Unit,
     onPaste: (String) -> Unit,
+    onReparent: (String, String) -> Unit,
+    onInsertChild: (String, RobloxClass) -> Unit,
     onOpenScript: (String) -> Unit,
     expandedNodes: MutableMap<String, Boolean>,
     searchQuery: String,
     classFilter: RobloxClass?,
-    onToggleDragMode: () -> Unit
+    onToggleDragMode: () -> Unit,
+    toolbarNodeId: String?,
+    onToolbarNodeChange: (String?) -> Unit,
+    draggingNodeId: String?,
+    dropTargetId: String?,
+    rowBounds: MutableMap<String, Rect>,
+    onDragStart: (String) -> Unit,
+    onDragPosition: (String, Offset) -> Unit,
+    onDragEnd: () -> Unit,
+    onDragCancel: () -> Unit
 ) {
     val isSelected = node.id == selectedId
     val isExpanded = expandedNodes[node.id] ?: false
@@ -237,6 +308,9 @@ fun RenderExplorerNode(
     val shouldRenderThisNode = matchesSearch && matchesFilter
 
     var showContextMenu by remember { mutableStateOf(false) }
+    var showAddMenu by remember { mutableStateOf(false) }
+    var rowCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    val isDropTarget = dropTargetId == node.id && draggingNodeId != null && draggingNodeId != node.id
 
     Column(modifier = Modifier.fillMaxWidth()) {
         if (shouldRenderThisNode) {
@@ -245,11 +319,23 @@ fun RenderExplorerNode(
                     .fillMaxWidth()
                     .height(34.dp)
                     .background(
-                        color = if (isSelected) Color(0xFF0A84FF).copy(alpha = 0.22f) else Color.Transparent,
+                        color = when {
+                            isDropTarget -> Color(0xFF22C55E).copy(alpha = 0.18f)
+                            isSelected -> Color(0xFF0A84FF).copy(alpha = 0.22f)
+                            draggingNodeId == node.id -> Color(0xFF8FBFF8).copy(alpha = 0.12f)
+                            else -> Color.Transparent
+                        },
                         shape = RoundedCornerShape(3.dp)
                     )
+                    .onGloballyPositioned { coordinates ->
+                        rowCoordinates = coordinates
+                        rowBounds[node.id] = coordinates.boundsInWindow()
+                    }
                     .combinedClickable(
-                        onClick = { onSelect(node.id) },
+                        onClick = {
+                            onSelect(node.id)
+                            if (toolbarNodeId != node.id) onToolbarNodeChange(null)
+                        },
                         onDoubleClick = {
                             if (node.className == RobloxClass.LocalScript || node.className == RobloxClass.ModuleScript) {
                                 onOpenScript(node.id)
@@ -258,8 +344,26 @@ fun RenderExplorerNode(
                                 onToggleDragMode()
                             }
                         },
-                        onLongClick = { showContextMenu = true }
+                        onLongClick = {
+                            onSelect(node.id)
+                            onToolbarNodeChange(node.id)
+                        }
                     )
+                    .pointerInput(node.id) {
+                        detectDragGesturesAfterLongPress(
+                            onDragStart = { startOffset ->
+                                onSelect(node.id)
+                                onDragStart(node.id)
+                                rowCoordinates?.localToWindow(startOffset)?.let { onDragPosition(node.id, it) }
+                            },
+                            onDrag = { change, _ ->
+                                change.consume()
+                                rowCoordinates?.localToWindow(change.position)?.let { onDragPosition(node.id, it) }
+                            },
+                            onDragEnd = onDragEnd,
+                            onDragCancel = onDragCancel
+                        )
+                    }
                     .padding(start = (depth * 12).dp, end = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -306,6 +410,80 @@ fun RenderExplorerNode(
                             modifier = Modifier.size(14.dp)
                         )
                     }
+                }
+            }
+
+            AnimatedVisibility(visible = toolbarNodeId == node.id) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = (depth * 12 + 24).dp, end = 4.dp, top = 2.dp, bottom = 4.dp)
+                        .background(Color(0xFF1B1D22), RoundedCornerShape(4.dp))
+                        .border(1.dp, Color(0xFF3D4148), RoundedCornerShape(4.dp))
+                        .padding(horizontal = 4.dp, vertical = 2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box {
+                        IconButton(
+                            onClick = { showAddMenu = true },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = "Insert Child", tint = Color(0xFF22C55E), modifier = Modifier.size(16.dp))
+                        }
+                        DropdownMenu(expanded = showAddMenu, onDismissRequest = { showAddMenu = false }) {
+                            listOf(
+                                RobloxClass.Frame,
+                                RobloxClass.TextLabel,
+                                RobloxClass.TextButton,
+                                RobloxClass.ImageLabel,
+                                RobloxClass.ImageButton,
+                                RobloxClass.UIGradient,
+                                RobloxClass.UICorner,
+                                RobloxClass.UIStroke,
+                                RobloxClass.LocalScript,
+                                RobloxClass.ModuleScript
+                            ).forEach { cls ->
+                                DropdownMenuItem(
+                                    leadingIcon = { RobloxClassIcon(className = cls, iconSize = 16.dp) },
+                                    text = { Text(cls.name, fontSize = 11.sp) },
+                                    onClick = {
+                                        expandedNodes[node.id] = true
+                                        onInsertChild(node.id, cls)
+                                        showAddMenu = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                    IconButton(onClick = { onCopy(node.id) }, modifier = Modifier.size(36.dp)) {
+                        Icon(Icons.Default.ContentCopy, contentDescription = "Copy", tint = Color(0xFFA6ACB3), modifier = Modifier.size(15.dp))
+                    }
+                    IconButton(onClick = { onPaste(node.id); expandedNodes[node.id] = true }, modifier = Modifier.size(36.dp)) {
+                        Icon(Icons.Default.ContentPaste, contentDescription = "Paste Inside", tint = Color(0xFFA6ACB3), modifier = Modifier.size(15.dp))
+                    }
+                    IconButton(
+                        onClick = { onDuplicate(node.id) },
+                        enabled = node.className != RobloxClass.ScreenGui,
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.ControlPointDuplicate,
+                            contentDescription = "Duplicate",
+                            tint = if (node.className != RobloxClass.ScreenGui) Color(0xFFA6ACB3) else Color(0xFF5E636B),
+                            modifier = Modifier.size(15.dp)
+                        )
+                    }
+                    IconButton(onClick = { onRenameRequest(node.id, node.name) }, modifier = Modifier.size(36.dp)) {
+                        Icon(Icons.Default.Edit, contentDescription = "Rename", tint = Color(0xFFA6ACB3), modifier = Modifier.size(15.dp))
+                    }
+                    Spacer(modifier = Modifier.weight(1f))
+                    Text(
+                        text = if (draggingNodeId == node.id) "Drop on target" else "Hold + drag to parent",
+                        color = Color(0xFF7E858F),
+                        fontSize = 9.sp,
+                        maxLines = 1
+                    )
                 }
             }
 
@@ -376,11 +554,22 @@ fun RenderExplorerNode(
                     onMove = onMove,
                     onCopy = onCopy,
                     onPaste = onPaste,
+                    onReparent = onReparent,
+                    onInsertChild = onInsertChild,
                     onOpenScript = onOpenScript,
                     expandedNodes = expandedNodes,
                     searchQuery = searchQuery,
                     classFilter = classFilter,
-                    onToggleDragMode = onToggleDragMode
+                    onToggleDragMode = onToggleDragMode,
+                    toolbarNodeId = toolbarNodeId,
+                    onToolbarNodeChange = onToolbarNodeChange,
+                    draggingNodeId = draggingNodeId,
+                    dropTargetId = dropTargetId,
+                    rowBounds = rowBounds,
+                    onDragStart = onDragStart,
+                    onDragPosition = onDragPosition,
+                    onDragEnd = onDragEnd,
+                    onDragCancel = onDragCancel
                 )
             }
         }

@@ -61,6 +61,13 @@ object LuauGenerator {
             // Assign properties
             obj.properties.forEach { (name, value) ->
                 if (isPropertyRelevant(obj.className, name)) {
+                    if (obj.className in listOf(RobloxClass.ImageLabel, RobloxClass.ImageButton) && name == "Image" && value is String) {
+                        val customAssetCode = formatCustomImageAssetAssignment(key, value)
+                        if (customAssetCode != null) {
+                            sb.append(customAssetCode)
+                            return@forEach
+                        }
+                    }
                     val formatted = formatPropertyValue(obj.className, name, value)
                     if (formatted != null) {
                         sb.append("GUI[\"$key\"][\"$name\"] = $formatted\n")
@@ -188,6 +195,32 @@ object LuauGenerator {
         }
     }
 
+    private fun formatCustomImageAssetAssignment(key: String, image: String): String? {
+        val trimmed = image.trim()
+        if (!trimmed.startsWith("http://", ignoreCase = true) && !trimmed.startsWith("https://", ignoreCase = true)) {
+            return null
+        }
+
+        val fileName = safeAssetFileName(trimmed)
+        val assetPath = fileName
+        return buildString {
+            appendLine("do")
+            appendLine("\tlocal imageUrl = ${formatLuauString(trimmed)}")
+            appendLine("\tlocal imagePath = ${formatLuauString(assetPath)}")
+            appendLine("\tif typeof(writefile) == \"function\" and typeof(readfile) == \"function\" and typeof(isfile) == \"function\" and typeof(getcustomasset) == \"function\" then")
+            appendLine("\t\tlocal hasFile = isfile(imagePath)")
+            appendLine("\t\tlocal cachedData = hasFile and readfile(imagePath) or nil")
+            appendLine("\t\tif not hasFile or cachedData == nil or #cachedData == 0 then")
+            appendLine("\t\t\twritefile(imagePath, game:HttpGet(imageUrl))")
+            appendLine("\t\tend")
+            appendLine("\t\tGUI[\"$key\"][\"Image\"] = getcustomasset(imagePath)")
+            appendLine("\telse")
+            appendLine("\t\tGUI[\"$key\"][\"Image\"] = imageUrl")
+            appendLine("\tend")
+            appendLine("end")
+        }
+    }
+
     private fun isUDimProperty(className: RobloxClass, propName: String): Boolean {
         return when (className) {
             RobloxClass.UIListLayout -> propName == "Padding"
@@ -261,6 +294,16 @@ object LuauGenerator {
             .replace("[^a-z0-9_-]+".toRegex(), "-")
             .trim('-')
             .ifBlank { "vanilla-ui" }
+    }
+
+    private fun safeAssetFileName(value: String): String {
+        val extension = value
+            .substringBefore('?')
+            .substringAfterLast('.', "png")
+            .lowercase(Locale.US)
+            .takeIf { it.matches("[a-z0-9]{2,5}".toRegex()) }
+            ?: "png"
+        return "vanilla_asset_${Integer.toHexString(value.hashCode())}.$extension"
     }
     
     private fun isPropertyRelevant(className: RobloxClass, propName: String): Boolean {

@@ -79,7 +79,7 @@ fun PropertiesPanel(
 
     Column(
         modifier = modifier
-            .background(Color(0xFF25272C))
+            .background(Color(0xFF202329))
             .border(1.dp, Color(0xFF3D4148))
             .verticalScroll(scrollState)
             .padding(8.dp)
@@ -88,7 +88,9 @@ fun PropertiesPanel(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(34.dp),
+                .height(40.dp)
+                .background(Color(0xFF252A31), RoundedCornerShape(4.dp))
+                .padding(horizontal = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -129,7 +131,7 @@ fun PropertiesPanel(
             }
         }
 
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
         // Basic Properties Group
         PropertySection(title = "Basic") {
@@ -817,14 +819,19 @@ fun PropertiesPanel(
 @Composable
 fun PropertySection(title: String, content: @Composable ColumnScope.() -> Unit) {
     var expanded by remember { mutableStateOf(true) }
-    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .border(1.dp, Color(0xFF343942), RoundedCornerShape(4.dp))
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(30.dp)
-                .background(Color(0xFF30333A), RoundedCornerShape(3.dp))
+                .height(32.dp)
+                .background(Color(0xFF2C3038), RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
                 .clickable { expanded = !expanded }
-                .padding(horizontal = 6.dp, vertical = 4.dp),
+                .padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
@@ -845,8 +852,9 @@ fun PropertySection(title: String, content: @Composable ColumnScope.() -> Unit) 
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 6.dp, top = 4.dp, end = 4.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                    .background(Color(0xFF242830))
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 content()
             }
@@ -857,18 +865,19 @@ fun PropertySection(title: String, content: @Composable ColumnScope.() -> Unit) 
 @Composable
 fun PropertyRow(label: String, content: @Composable () -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().heightIn(min = 32.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
+        modifier = Modifier.fillMaxWidth().heightIn(min = 36.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
             text = label,
-            color = Color(180, 180, 185),
+            color = Color(0xFFADB4BE),
             fontSize = 10.sp,
-            modifier = Modifier.weight(1f)
+            maxLines = 1,
+            modifier = Modifier.weight(0.92f)
         )
         Box(
-            modifier = Modifier.weight(1.35f),
+            modifier = Modifier.weight(1.72f),
             contentAlignment = Alignment.CenterEnd
         ) {
             content()
@@ -995,25 +1004,39 @@ fun CoordinateInputBox(label: String, value: String, onValueChange: (String) -> 
             value = value,
             onValueChange = onValueChange,
             singleLine = true,
-            textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 9.sp, textAlign = TextAlign.Center),
+            textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 11.sp, textAlign = TextAlign.Center),
             modifier = Modifier
                 .fillMaxWidth()
-                .height(26.dp),
+                .height(42.dp),
             cursorBrush = SolidColor(Color(0, 162, 255)),
             decorationBox = { innerTextField ->
-                Box(
+                Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color(0xFF1C1E22), RoundedCornerShape(3.dp))
-                        .border(1.dp, Color(0xFF3D4148), RoundedCornerShape(3.dp)),
-                    contentAlignment = Alignment.Center
+                        .background(Color(0xFF171A1F), RoundedCornerShape(4.dp))
+                        .border(1.dp, Color(0xFF404650), RoundedCornerShape(4.dp))
+                        .padding(horizontal = 4.dp, vertical = 3.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    innerTextField()
+                    Text(
+                        label,
+                        fontSize = 7.sp,
+                        color = Color(0xFF7F8792),
+                        maxLines = 1,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        innerTextField()
+                    }
                 }
             }
         )
-        Spacer(modifier = Modifier.height(2.dp))
-        Text(label, fontSize = 7.sp, color = Color.Gray)
     }
 }
 
@@ -1025,9 +1048,9 @@ fun StepperInput(value: Int, onValueChange: (Int) -> Unit, min: Int, max: Int) {
     ) {
         IconButton(
             onClick = { if (value > min) onValueChange(value - 1) },
-            modifier = Modifier.size(28.dp)
+            modifier = Modifier.size(36.dp)
         ) {
-            Icon(Icons.Default.Remove, contentDescription = "Decrement", tint = Color.White, modifier = Modifier.size(12.dp))
+            Icon(Icons.Default.Remove, contentDescription = "Decrement", tint = Color.White, modifier = Modifier.size(14.dp))
         }
         Text(
             text = value.toString(),
@@ -1039,9 +1062,9 @@ fun StepperInput(value: Int, onValueChange: (Int) -> Unit, min: Int, max: Int) {
         )
         IconButton(
             onClick = { if (value < max) onValueChange(value + 1) },
-            modifier = Modifier.size(28.dp)
+            modifier = Modifier.size(36.dp)
         ) {
-            Icon(Icons.Default.Add, contentDescription = "Increment", tint = Color.White, modifier = Modifier.size(12.dp))
+            Icon(Icons.Default.Add, contentDescription = "Increment", tint = Color.White, modifier = Modifier.size(14.dp))
         }
     }
 }

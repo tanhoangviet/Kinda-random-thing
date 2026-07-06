@@ -647,12 +647,14 @@ fun GradientPickerDialog(
         properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Card(
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(24, 24, 28)),
+            shape = RoundedCornerShape(8.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(26, 28, 32)),
             border = BorderStroke(1.dp, Color(60, 60, 65)),
             modifier = Modifier
-                .fillMaxWidth(0.95f)
-                .padding(16.dp)
+                .fillMaxWidth(0.74f)
+                .widthIn(max = 560.dp)
+                .heightIn(max = 620.dp)
+                .padding(8.dp)
                 .offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) }
         ) {
             Column(modifier = Modifier.fillMaxWidth()) {
@@ -669,7 +671,7 @@ fun GradientPickerDialog(
                                 offsetY += dragAmount.y
                             }
                         }
-                        .padding(horizontal = 14.dp, vertical = 10.dp)
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
                 ) {
                     Box(
                         modifier = Modifier
@@ -699,45 +701,73 @@ fun GradientPickerDialog(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(14.dp)
+                        .padding(10.dp)
                         .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     // Main Gradient Showcase Card
                     Card(
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(6.dp),
                         border = BorderStroke(1.dp, Color(60, 60, 65)),
                         colors = CardDefaults.cardColors(containerColor = Color(28, 28, 32)),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text(Locales.translate("gradient_preview", lang), fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = Color.Gray)
                             
                             // Main Gradient Strip
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(44.dp)
-                                    .clip(RoundedCornerShape(6.dp))
+                                    .height(28.dp)
+                                    .clip(RoundedCornerShape(4.dp))
                                     .background(
                                         Brush.linearGradient(
                                             colorStops = stops.map { it.position to it.color }.toTypedArray()
                                         )
                                     )
-                                    .border(1.dp, Color(50, 50, 55), RoundedCornerShape(6.dp))
+                                    .border(1.dp, Color(50, 50, 55), RoundedCornerShape(4.dp))
+                            )
+                        }
+                    }
+
+                    val gradientPresets = listOf(
+                        listOf(GradientStop(0f, Color(0xFF0EA5E9)), GradientStop(1f, Color(0xFF22C55E))),
+                        listOf(GradientStop(0f, Color(0xFFF97316)), GradientStop(1f, Color(0xFFEF4444))),
+                        listOf(GradientStop(0f, Color(0xFF111827)), GradientStop(1f, Color(0xFFE5E7EB))),
+                        listOf(GradientStop(0f, Color(0xFF8B5CF6)), GradientStop(0.5f, Color(0xFFEC4899)), GradientStop(1f, Color(0xFFF59E0B))),
+                        listOf(GradientStop(0f, Color(0xFF14B8A6)), GradientStop(1f, Color(0xFF1D4ED8)))
+                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        gradientPresets.forEach { preset ->
+                            Box(
+                                modifier = Modifier
+                                    .size(width = 54.dp, height = 24.dp)
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(Brush.horizontalGradient(colorStops = preset.map { it.position to it.color }.toTypedArray()))
+                                    .border(1.dp, Color(65, 70, 78), RoundedCornerShape(4.dp))
+                                    .clickable {
+                                        stops = preset
+                                        selectedStopIndex = 0
+                                    }
                             )
                         }
                     }
 
                     // Interactive Stops Control Strip (DPI-Responsive & Drag-Optimized)
                     Card(
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(6.dp),
                         border = BorderStroke(1.dp, Color(60, 60, 65)),
                         colors = CardDefaults.cardColors(containerColor = Color(20, 20, 24)),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
                             verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -750,7 +780,7 @@ fun GradientPickerDialog(
                             BoxWithConstraints(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(44.dp)
+                                    .height(36.dp)
                                     .pointerInput(stops) {
                                         detectTapGestures { offset ->
                                             val w = size.width.toFloat()
@@ -847,18 +877,18 @@ fun GradientPickerDialog(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .horizontalScroll(rememberScrollState())
-                                    .padding(vertical = 4.dp),
+                                    .padding(vertical = 2.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 stops.forEachIndexed { index, stop ->
                                     val isSelected = index == selectedStopIndex
                                     Row(
                                         modifier = Modifier
-                                            .clip(RoundedCornerShape(8.dp))
+                                            .clip(RoundedCornerShape(4.dp))
                                             .background(if (isSelected) Color(0, 162, 255).copy(alpha = 0.2f) else Color(30, 30, 35))
-                                            .border(1.dp, if (isSelected) Color(0, 162, 255) else Color(50, 50, 55), RoundedCornerShape(8.dp))
+                                            .border(1.dp, if (isSelected) Color(0, 162, 255) else Color(50, 50, 55), RoundedCornerShape(4.dp))
                                             .clickable { selectedStopIndex = index }
-                                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                                            .padding(horizontal = 8.dp, vertical = 4.dp),
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                                     ) {
@@ -891,14 +921,14 @@ fun GradientPickerDialog(
                         var value by remember(currentStop.color) { mutableStateOf(hsv[2]) }
 
                         Card(
-                            shape = RoundedCornerShape(10.dp),
+                            shape = RoundedCornerShape(6.dp),
                             border = BorderStroke(1.dp, Color(65, 65, 70)),
                             colors = CardDefaults.cardColors(containerColor = Color(28, 28, 32)),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Column(
-                                modifier = Modifier.padding(12.dp), 
-                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                                modifier = Modifier.padding(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 // Header of current stop settings
                                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -974,7 +1004,7 @@ fun GradientPickerDialog(
                                     },
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(184.dp)
+                                        .height(128.dp)
                                 )
 
                                 // 1. Hue Spectrum Slider

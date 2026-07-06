@@ -5,6 +5,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.horizontalScroll
@@ -20,6 +21,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -30,9 +32,11 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.example.R
 import com.example.data.local.ProjectEntity
 import com.example.data.model.RobloxClass
@@ -187,6 +191,8 @@ fun MainWorkspace(
                             onMove = { id, up -> viewModel.moveObjectInHierarchy(id, up) },
                             onCopy = { viewModel.copyObject(it) },
                             onPaste = { viewModel.pasteObject(it) },
+                            onReparent = { id, targetParentId -> viewModel.reparentObject(id, targetParentId) },
+                            onInsertChild = { parentId, className -> viewModel.insertObjectInto(parentId, className) },
                             onOpenScript = { viewModel.openScriptEditor(it) },
                             onToggleDragMode = { viewModel.setUseSingleDragMode(!useSingleDragMode) },
                             onMinimize = { explorerMinimized = true },
@@ -858,23 +864,38 @@ private fun MacSettingsDialog(
     val contentScroll = rememberScrollState()
     val themeScroll = rememberScrollState()
 
-    Dialog(onDismissRequest = onDismiss) {
+    var offsetX by remember { mutableStateOf(0f) }
+    var offsetY by remember { mutableStateOf(0f) }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
         Surface(
             modifier = Modifier
-                .fillMaxWidth(0.98f)
-                .fillMaxHeight(0.96f)
-                .widthIn(max = 920.dp),
+                .fillMaxWidth(0.82f)
+                .fillMaxHeight(0.86f)
+                .widthIn(max = 760.dp)
+                .heightIn(min = 420.dp, max = 640.dp)
+                .offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) },
             color = Color(0xFF202124),
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(0.dp),
             border = BorderStroke(1.dp, Color(0xFF3D4148))
         ) {
             Column {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp)
+                        .height(44.dp)
                         .background(Color(0xFF2B2D33))
-                        .padding(horizontal = 16.dp),
+                        .pointerInput(Unit) {
+                            detectDragGestures { change, dragAmount ->
+                                change.consume()
+                                offsetX += dragAmount.x
+                                offsetY += dragAmount.y
+                            }
+                        }
+                        .padding(horizontal = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     MacTrafficDot(Color(0xFFFF5F57))
@@ -882,16 +903,20 @@ private fun MacSettingsDialog(
                     MacTrafficDot(Color(0xFFFFBD2E))
                     Spacer(modifier = Modifier.width(8.dp))
                     MacTrafficDot(Color(0xFF28C840))
-                    Spacer(modifier = Modifier.width(16.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
                     Text("Settings", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     Spacer(modifier = Modifier.weight(1f))
                     Text("UI $uiScalePercent%", color = accent, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(40.dp)) {
+                        Icon(Icons.Default.Close, contentDescription = "Close Settings", tint = Color(0xFFA6ACB3), modifier = Modifier.size(18.dp))
+                    }
                 }
 
                 Row(modifier = Modifier.fillMaxSize()) {
                     Column(
                         modifier = Modifier
-                            .width(184.dp)
+                            .width(160.dp)
                             .fillMaxHeight()
                             .background(Color(0xFF25272C))
                             .padding(8.dp),
@@ -920,10 +945,10 @@ private fun MacSettingsDialog(
                             .weight(1f)
                             .fillMaxHeight()
                             .verticalScroll(contentScroll)
-                            .padding(18.dp),
-                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Text(section, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                        Text(section, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                         when (section) {
                             "Theme" -> {
                                 Text("Chọn theme editor", color = Color(0xFFA6ACB3), fontSize = 12.sp)
@@ -991,7 +1016,7 @@ private fun MacSettingsDialog(
                             else -> {
                                 MacSettingsToggle("Single drag mode", "Khóa camera khi chọn object, kéo góc để resize.", useSingleDragMode, onUseSingleDragModeChange)
                                 MacSettingsToggle("Show topbar", "Ẩn/hiện topbar để lấy thêm không gian edit.", isTopbarVisible, onTopbarVisibleChange)
-                                SettingsInfoRow("Floating settings removed", "Settings đã chuyển về topbar/menu để viewport sạch hơn.")
+                                SettingsInfoRow("Floating settings", "Cửa sổ này có thể kéo bằng topbar và không bo góc.")
                             }
                         }
                         Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
@@ -1029,7 +1054,7 @@ private fun MacSettingsSidebarItem(
         modifier = Modifier
             .fillMaxWidth()
             .height(40.dp)
-            .background(if (selected) accent.copy(alpha = 0.18f) else Color.Transparent, RoundedCornerShape(8.dp))
+            .background(if (selected) accent.copy(alpha = 0.18f) else Color.Transparent, RoundedCornerShape(4.dp))
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -1048,15 +1073,20 @@ private fun MacSettingsToggle(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0xFF2B2D33), RoundedCornerShape(8.dp))
-            .padding(horizontal = 14.dp, vertical = 10.dp),
+            .heightIn(min = 48.dp)
+            .background(Color(0xFF2B2D33), RoundedCornerShape(4.dp))
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(title, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
             Text(subtitle, color = Color(0xFFA6ACB3), fontSize = 11.sp)
         }
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            modifier = Modifier.scale(0.82f)
+        )
     }
 }
 
@@ -1065,12 +1095,12 @@ private fun SettingsInfoRow(title: String, value: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0xFF2B2D33), RoundedCornerShape(8.dp))
-            .padding(horizontal = 14.dp, vertical = 12.dp),
+            .background(Color(0xFF2B2D33), RoundedCornerShape(4.dp))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(title, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, modifier = Modifier.weight(1f))
-        Text(value, color = Color(0xFFA6ACB3), fontSize = 12.sp)
+        Text(value, color = Color(0xFFA6ACB3), fontSize = 11.sp, modifier = Modifier.weight(1.25f))
     }
 }
 

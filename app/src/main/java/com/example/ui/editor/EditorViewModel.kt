@@ -1,6 +1,7 @@
 package com.example.ui.editor
 
 import android.app.Application
+import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.local.AppDatabase
@@ -17,6 +18,7 @@ import java.util.UUID
 
 class EditorViewModel(application: Application) : AndroidViewModel(application) {
 
+    private val settingsPrefs = application.getSharedPreferences("vanilla_editor_settings", Context.MODE_PRIVATE)
     private val repository: ProjectRepository
     
     init {
@@ -38,10 +40,13 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     private val _currentProjectDescription = MutableStateFlow("Designed on Mobile")
     val currentProjectDescription: StateFlow<String> = _currentProjectDescription.asStateFlow()
 
-    private val _screenWidth = MutableStateFlow(1280)
+    private val initialDevicePreview = settingsPrefs.getString("devicePreview", "Phone 16:9") ?: "Phone 16:9"
+    private val initialScreenSize = screenSizeForDevice(initialDevicePreview)
+
+    private val _screenWidth = MutableStateFlow(initialScreenSize.first)
     val screenWidth: StateFlow<Int> = _screenWidth.asStateFlow()
 
-    private val _screenHeight = MutableStateFlow(720)
+    private val _screenHeight = MutableStateFlow(initialScreenSize.second)
     val screenHeight: StateFlow<Int> = _screenHeight.asStateFlow()
 
     // Roblox Object Hierarchy Root
@@ -66,23 +71,25 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     private val _isPreviewMode = MutableStateFlow(false)
     val isPreviewMode: StateFlow<Boolean> = _isPreviewMode.asStateFlow()
 
-    private val _showGrid = MutableStateFlow(true)
+    private val _showGrid = MutableStateFlow(settingsPrefs.getBoolean("showGrid", true))
     val showGrid: StateFlow<Boolean> = _showGrid.asStateFlow()
 
-    private val _snapToGrid = MutableStateFlow(true)
+    private val _snapToGrid = MutableStateFlow(settingsPrefs.getBoolean("snapToGrid", true))
     val snapToGrid: StateFlow<Boolean> = _snapToGrid.asStateFlow()
 
-    private val _gridSize = MutableStateFlow(10)
+    private val _gridSize = MutableStateFlow(settingsPrefs.getInt("gridSize", 10).coerceIn(4, 64))
     val gridSize: StateFlow<Int> = _gridSize.asStateFlow()
 
-    private val _devicePreviewType = MutableStateFlow("Phone 16:9") // "Phone 16:9", "Phone 20:9", "Tablet", "Desktop"
+    private val _devicePreviewType = MutableStateFlow(initialDevicePreview) // "Phone 16:9", "Phone 20:9", "Tablet", "Desktop"
     val devicePreviewType: StateFlow<String> = _devicePreviewType.asStateFlow()
 
-    private val _language = MutableStateFlow("vi") // "en" or "vi"
+    private val _language = MutableStateFlow(settingsPrefs.getString("language", "vi") ?: "vi") // "en" or "vi"
     val language: StateFlow<String> = _language.asStateFlow()
 
     fun toggleLanguage() {
-        _language.value = if (_language.value == "en") "vi" else "en"
+        val next = if (_language.value == "en") "vi" else "en"
+        _language.value = next
+        settingsPrefs.edit().putString("language", next).apply()
     }
 
     // Undo / Redo Stacks
@@ -95,6 +102,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
 
     // Autosave job
     private var autosaveJob: Job? = null
+    private var lastTransformHistoryAt = 0L
 
     // Helper: Find selected object in tree
     val selectedObject: StateFlow<RobloxObject?> = combine(_rootObject, _selectedObjectId) { root, selectedId ->
@@ -210,27 +218,29 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     // --- Custom User Settings ---
-    private val _useSingleDragMode = MutableStateFlow(false)
+    private val _useSingleDragMode = MutableStateFlow(settingsPrefs.getBoolean("useSingleDragMode", false))
     val useSingleDragMode: StateFlow<Boolean> = _useSingleDragMode.asStateFlow()
 
-    private val _isTopbarVisible = MutableStateFlow(true)
+    private val _isTopbarVisible = MutableStateFlow(settingsPrefs.getBoolean("isTopbarVisible", true))
     val isTopbarVisible: StateFlow<Boolean> = _isTopbarVisible.asStateFlow()
 
     private val _showSettingsDialog = MutableStateFlow(false)
     val showSettingsDialog: StateFlow<Boolean> = _showSettingsDialog.asStateFlow()
 
-    private val _uiScalePercent = MutableStateFlow(40)
+    private val _uiScalePercent = MutableStateFlow(settingsPrefs.getInt("uiScalePercent", 40).coerceIn(40, 140))
     val uiScalePercent: StateFlow<Int> = _uiScalePercent.asStateFlow()
 
-    private val _studioTheme = MutableStateFlow("Studio Dark")
+    private val _studioTheme = MutableStateFlow(settingsPrefs.getString("studioTheme", "Studio Dark") ?: "Studio Dark")
     val studioTheme: StateFlow<String> = _studioTheme.asStateFlow()
 
     fun setUseSingleDragMode(enabled: Boolean) {
         _useSingleDragMode.value = enabled
+        settingsPrefs.edit().putBoolean("useSingleDragMode", enabled).apply()
     }
 
     fun setTopbarVisible(visible: Boolean) {
         _isTopbarVisible.value = visible
+        settingsPrefs.edit().putBoolean("isTopbarVisible", visible).apply()
     }
 
     fun setShowSettingsDialog(show: Boolean) {
@@ -238,11 +248,14 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun setUiScalePercent(percent: Int) {
-        _uiScalePercent.value = percent.coerceIn(40, 140)
+        val next = percent.coerceIn(40, 140)
+        _uiScalePercent.value = next
+        settingsPrefs.edit().putInt("uiScalePercent", next).apply()
     }
 
     fun setStudioTheme(theme: String) {
         _studioTheme.value = theme
+        settingsPrefs.edit().putString("studioTheme", theme).apply()
     }
 
     fun togglePreviewMode() {
@@ -251,30 +264,37 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
 
     fun setShowGrid(show: Boolean) {
         _showGrid.value = show
+        settingsPrefs.edit().putBoolean("showGrid", show).apply()
     }
 
     fun setSnapToGrid(snap: Boolean) {
         _snapToGrid.value = snap
+        settingsPrefs.edit().putBoolean("snapToGrid", snap).apply()
     }
 
     fun setGridSize(size: Int) {
-        _gridSize.value = size
+        val next = size.coerceIn(4, 64)
+        _gridSize.value = next
+        settingsPrefs.edit().putInt("gridSize", next).apply()
     }
 
     fun setDevicePreview(device: String) {
         _devicePreviewType.value = device
-        when (device) {
-            "Phone 16:9" -> { _screenWidth.value = 1280; _screenHeight.value = 720 }
-            "Phone 20:9" -> { _screenWidth.value = 1600; _screenHeight.value = 720 }
-            "Tablet" -> { _screenWidth.value = 1024; _screenHeight.value = 768 }
-            "Desktop" -> { _screenWidth.value = 1920; _screenHeight.value = 1080 }
-        }
+        settingsPrefs.edit().putString("devicePreview", device).apply()
+        val (width, height) = screenSizeForDevice(device)
+        _screenWidth.value = width
+        _screenHeight.value = height
+        triggerAutosave()
     }
 
     // --- Object Manipulation ---
 
     fun insertObject(className: RobloxClass) {
         val parentId = _selectedObjectId.value ?: _rootObject.value.id
+        insertObjectInto(parentId, className)
+    }
+
+    fun insertObjectInto(parentId: String, className: RobloxClass) {
         val newObj = createDefaultObject(className)
         
         saveHistoryState()
@@ -329,7 +349,11 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun updateTransform(id: String, position: UDim2, size: UDim2) {
-        saveHistoryState()
+        val now = System.currentTimeMillis()
+        if (now - lastTransformHistoryAt > 350L) {
+            saveHistoryState()
+            lastTransformHistoryAt = now
+        }
         _rootObject.value = updateObjectInTree(_rootObject.value, id) { old ->
             val updated = old.properties.toMutableMap()
             updated["Position"] = position
@@ -337,6 +361,22 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
             old.copy(properties = updated)
         }
         triggerAutosave()
+    }
+
+    fun reparentObject(id: String, targetParentId: String): Boolean {
+        if (id == _rootObject.value.id || id == targetParentId) return false
+        val movingObject = findObjectById(_rootObject.value, id) ?: return false
+        if (containsObject(movingObject, targetParentId)) return false
+        val currentParent = findParentInTree(_rootObject.value, id) ?: return false
+        if (currentParent.id == targetParentId) return false
+        if (findObjectById(_rootObject.value, targetParentId) == null) return false
+
+        saveHistoryState()
+        val withoutMovingObject = deleteObjectFromTree(_rootObject.value, id)
+        _rootObject.value = insertObjectInTree(withoutMovingObject, targetParentId, movingObject)
+        _selectedObjectId.value = id
+        triggerAutosave()
+        return true
     }
 
     fun moveObjectInHierarchy(id: String, moveUp: Boolean) {
@@ -517,6 +557,20 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
             if (parent != null) return parent
         }
         return null
+    }
+
+    private fun containsObject(root: RobloxObject, targetId: String): Boolean {
+        if (root.id == targetId) return true
+        return root.children.any { containsObject(it, targetId) }
+    }
+
+    private fun screenSizeForDevice(device: String): Pair<Int, Int> {
+        return when (device) {
+            "Phone 20:9" -> 1600 to 720
+            "Tablet" -> 1024 to 768
+            "Desktop" -> 1920 to 1080
+            else -> 1280 to 720
+        }
     }
 
     private fun updateObjectInTree(
