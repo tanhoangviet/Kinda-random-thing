@@ -5,6 +5,7 @@ import org.json.JSONObject
 
 enum class RobloxClass {
     ScreenGui,
+    Folder,
     Frame,
     TextLabel,
     TextButton,
@@ -12,6 +13,7 @@ enum class RobloxClass {
     ImageButton,
     ScrollingFrame,
     ViewportFrame,
+    Path2D,
     UIListLayout,
     UIGridLayout,
     UIPadding,
@@ -165,7 +167,8 @@ fun createDefaultObject(className: RobloxClass, customName: String? = null): Rob
         RobloxClass.ImageLabel,
         RobloxClass.ImageButton,
         RobloxClass.ScrollingFrame,
-        RobloxClass.ViewportFrame
+        RobloxClass.ViewportFrame,
+        RobloxClass.Path2D
     )
     if (isGuiObject) {
         properties["Visible"] = true
@@ -178,6 +181,9 @@ fun createDefaultObject(className: RobloxClass, customName: String? = null): Rob
         RobloxClass.ScreenGui -> {
             properties["ResetOnSpawn"] = true
             properties["Enabled"] = true
+        }
+        RobloxClass.Folder -> {
+            // Folder intentionally has no visual properties.
         }
         RobloxClass.Frame -> {
             properties["Size"] = UDim2(0.3f, 0, 0.3f, 0)
@@ -249,7 +255,7 @@ fun createDefaultObject(className: RobloxClass, customName: String? = null): Rob
             properties["AutoButtonColor"] = true
         }
         RobloxClass.ScrollingFrame -> {
-            properties["Size"] = UDim2(0.4f, 0, 0.4f, 0)
+            properties["Size"] = UDim2(0.62f, 0, 0.56f, 0)
             properties["Position"] = UDim2(0.1f, 0, 0.1f, 0)
             properties["AnchorPoint"] = Vector2(0f, 0f)
             properties["BackgroundColor3"] = Color3(35, 35, 35)
@@ -261,13 +267,23 @@ fun createDefaultObject(className: RobloxClass, customName: String? = null): Rob
             properties["ClipsDescendants"] = true
         }
         RobloxClass.ViewportFrame -> {
-            properties["Size"] = UDim2(0.3f, 0, 0.3f, 0)
+            properties["Size"] = UDim2(0.5f, 0, 0.44f, 0)
             properties["Position"] = UDim2(0.1f, 0, 0.1f, 0)
             properties["AnchorPoint"] = Vector2(0f, 0f)
             properties["BackgroundColor3"] = Color3(0, 0, 0)
             properties["BackgroundTransparency"] = 0f
             properties["BorderSizePixel"] = 1
             properties["ImageTransparency"] = 0f
+        }
+        RobloxClass.Path2D -> {
+            properties["Size"] = UDim2(0.5f, 0, 0.28f, 0)
+            properties["Position"] = UDim2(0.18f, 0, 0.2f, 0)
+            properties["AnchorPoint"] = Vector2(0f, 0f)
+            properties["Color3"] = Color3(0, 162, 255)
+            properties["Transparency"] = 0f
+            properties["Thickness"] = 4
+            properties["Closed"] = false
+            properties["ControlPoints"] = "0.00,0.80;0.26,0.24;0.58,0.66;1.00,0.18"
         }
         RobloxClass.UIListLayout -> {
             properties["FillDirection"] = "Vertical"

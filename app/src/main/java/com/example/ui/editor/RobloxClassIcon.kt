@@ -31,6 +31,7 @@ fun RobloxClassIcon(
 private fun RobloxClass.vanillaIconRes(): Int {
     return when (this) {
         RobloxClass.ScreenGui -> R.drawable.vanilla_instance_screengui
+        RobloxClass.Folder -> R.drawable.vanilla_instance_folder
         RobloxClass.Frame -> R.drawable.vanilla_instance_frame
         RobloxClass.TextLabel -> R.drawable.vanilla_instance_textlabel
         RobloxClass.TextButton -> R.drawable.vanilla_instance_textbutton
@@ -38,6 +39,7 @@ private fun RobloxClass.vanillaIconRes(): Int {
         RobloxClass.ImageButton -> R.drawable.vanilla_instance_imagebutton
         RobloxClass.ScrollingFrame -> R.drawable.vanilla_instance_scrollingframe
         RobloxClass.ViewportFrame -> R.drawable.vanilla_instance_viewportframe
+        RobloxClass.Path2D -> R.drawable.vanilla_instance_path2d
         RobloxClass.UIListLayout -> R.drawable.vanilla_instance_uilistlayout
         RobloxClass.UIGridLayout -> R.drawable.vanilla_instance_uigridlayout
         RobloxClass.UIPadding -> R.drawable.vanilla_instance_uipadding

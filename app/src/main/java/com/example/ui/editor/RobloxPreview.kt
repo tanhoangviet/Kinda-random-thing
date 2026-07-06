@@ -4,6 +4,11 @@
 )
 package com.example.ui.editor
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -32,6 +37,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -57,7 +64,8 @@ fun RobloxCanvasPreview(
     gridSize: Int,
     isPreviewMode: Boolean,
     useSingleDragMode: Boolean = false,
-    onToggleDragMode: () -> Unit = {}
+    onToggleDragMode: () -> Unit = {},
+    onOpenScrollMode: (String) -> Unit = {}
 ) {
     Box(
         modifier = Modifier
@@ -90,7 +98,8 @@ fun RobloxCanvasPreview(
                 gridSize = gridSize,
                 scaleFactor = scaleFactor,
                 useSingleDragMode = useSingleDragMode,
-                onToggleDragMode = onToggleDragMode
+                onToggleDragMode = onToggleDragMode,
+                onOpenScrollMode = onOpenScrollMode
             )
         }
 
@@ -160,6 +169,144 @@ fun CanvasGrid(gridSize: Int, width: Int, height: Int) {
     }
 }
 
+private enum class ResizeEdge { Left, Right, Top, Bottom }
+
+@Composable
+private fun BoxScope.EdgeResizeHandle(
+    edge: ResizeEdge,
+    objId: String,
+    currentPos: UDim2,
+    currentSize: UDim2,
+    density: Float,
+    currentScaleFactor: Float,
+    currentSnapToGrid: Boolean,
+    currentGridSize: Int,
+    currentParentW: Float,
+    currentParentH: Float,
+    onMoveOrResize: (String, UDim2, UDim2) -> Unit
+) {
+    val alignment = when (edge) {
+        ResizeEdge.Left -> Alignment.CenterStart
+        ResizeEdge.Right -> Alignment.CenterEnd
+        ResizeEdge.Top -> Alignment.TopCenter
+        ResizeEdge.Bottom -> Alignment.BottomCenter
+    }
+    val handleModifier = when (edge) {
+        ResizeEdge.Left, ResizeEdge.Right -> Modifier.width(28.dp).fillMaxHeight()
+        ResizeEdge.Top, ResizeEdge.Bottom -> Modifier.fillMaxWidth().height(28.dp)
+    }
+
+    Box(
+        modifier = handleModifier
+            .align(alignment)
+            .pointerInput(objId, edge) {
+                var startPos = currentPos
+                var startSize = currentSize
+                var dragAccumulatedX = 0f
+                var dragAccumulatedY = 0f
+                detectDragGestures(
+                    onDragStart = {
+                        startPos = currentPos
+                        startSize = currentSize
+                        dragAccumulatedX = 0f
+                        dragAccumulatedY = 0f
+                    },
+                    onDrag = { change, dragAmount ->
+                        change.consume()
+                        dragAccumulatedX += dragAmount.x / (density * currentScaleFactor)
+                        dragAccumulatedY += dragAmount.y / (density * currentScaleFactor)
+
+                        val minOffsetX = (10 - (startSize.scaleX * currentParentW)).toInt()
+                        val minOffsetY = (10 - (startSize.scaleY * currentParentH)).toInt()
+
+                        fun snap(raw: Float): Int {
+                            return if (currentSnapToGrid && currentGridSize > 1) {
+                                (raw.roundToInt() / currentGridSize) * currentGridSize
+                            } else {
+                                raw.roundToInt()
+                            }
+                        }
+
+                        when (edge) {
+                            ResizeEdge.Left -> {
+                                val safeW = snap(startSize.offsetX - dragAccumulatedX).coerceAtLeast(minOffsetX)
+                                val adjustedX = startPos.offsetX + (startSize.offsetX - safeW)
+                                onMoveOrResize(objId, currentPos.copy(offsetX = adjustedX), currentSize.copy(offsetX = safeW))
+                            }
+                            ResizeEdge.Right -> {
+                                val safeW = snap(startSize.offsetX + dragAccumulatedX).coerceAtLeast(minOffsetX)
+                                onMoveOrResize(objId, currentPos, currentSize.copy(offsetX = safeW))
+                            }
+                            ResizeEdge.Top -> {
+                                val safeH = snap(startSize.offsetY - dragAccumulatedY).coerceAtLeast(minOffsetY)
+                                val adjustedY = startPos.offsetY + (startSize.offsetY - safeH)
+                                onMoveOrResize(objId, currentPos.copy(offsetY = adjustedY), currentSize.copy(offsetY = safeH))
+                            }
+                            ResizeEdge.Bottom -> {
+                                val safeH = snap(startSize.offsetY + dragAccumulatedY).coerceAtLeast(minOffsetY)
+                                onMoveOrResize(objId, currentPos, currentSize.copy(offsetY = safeH))
+                            }
+                        }
+                    }
+                )
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        val visualModifier = when (edge) {
+            ResizeEdge.Left, ResizeEdge.Right -> Modifier.size(width = 4.dp, height = 36.dp)
+            ResizeEdge.Top, ResizeEdge.Bottom -> Modifier.size(width = 36.dp, height = 4.dp)
+        }
+        Box(
+            modifier = visualModifier
+                .background(Color(0, 162, 255), RoundedCornerShape(2.dp))
+                .border(1.dp, Color.White.copy(alpha = 0.85f), RoundedCornerShape(2.dp))
+        )
+    }
+}
+
+private data class LocalTweenPreviewSpec(
+    val enabled: Boolean,
+    val movesPosition: Boolean,
+    val resizes: Boolean,
+    val fades: Boolean
+)
+
+private fun resolveLocalScriptTweenPreview(obj: RobloxObject): LocalTweenPreviewSpec {
+    val source = obj.children
+        .filter { it.className == RobloxClass.LocalScript }
+        .joinToString("\n") { it.properties["Source"] as? String ?: "" }
+        .lowercase()
+    val hasTween = source.contains("tweenservice") || source.contains(":create(") || source.contains("tween")
+    if (!hasTween) {
+        return LocalTweenPreviewSpec(enabled = false, movesPosition = false, resizes = false, fades = false)
+    }
+    val moves = source.contains("position")
+    val resizes = source.contains("size")
+    val fades = source.contains("transparency")
+    return LocalTweenPreviewSpec(
+        enabled = true,
+        movesPosition = moves || (!resizes && !fades),
+        resizes = resizes,
+        fades = fades
+    )
+}
+
+private fun RobloxClass.isRenderDecoratorClass(): Boolean {
+    return this in setOf(
+        RobloxClass.UICorner,
+        RobloxClass.UIStroke,
+        RobloxClass.UIGradient,
+        RobloxClass.UIAspectRatioConstraint,
+        RobloxClass.UIScale,
+        RobloxClass.UIShadow,
+        RobloxClass.UIPadding,
+        RobloxClass.UIListLayout,
+        RobloxClass.UIGridLayout,
+        RobloxClass.LocalScript,
+        RobloxClass.ModuleScript
+    )
+}
+
 @Composable
 fun RenderRobloxObject(
     obj: RobloxObject,
@@ -173,11 +320,37 @@ fun RenderRobloxObject(
     gridSize: Int,
     scaleFactor: Float,
     useSingleDragMode: Boolean = false,
-    onToggleDragMode: () -> Unit = {}
+    onToggleDragMode: () -> Unit = {},
+    onOpenScrollMode: (String) -> Unit = {}
 ) {
     // Check basic structural values
     val isVisible = obj.properties["Visible"] as? Boolean ?: true
     if (!isVisible) return
+
+    if (obj.className == RobloxClass.Folder || obj.className == RobloxClass.ScreenGui) {
+        obj.children
+            .filter { !it.className.isRenderDecoratorClass() }
+            .forEach { child ->
+                RenderRobloxObject(
+                    obj = child,
+                    parentW = parentW,
+                    parentH = parentH,
+                    selectedId = selectedId,
+                    onSelect = onSelect,
+                    onMoveOrResize = onMoveOrResize,
+                    isPreviewMode = isPreviewMode,
+                    snapToGrid = snapToGrid,
+                    gridSize = gridSize,
+                    scaleFactor = scaleFactor,
+                    useSingleDragMode = useSingleDragMode,
+                    onToggleDragMode = onToggleDragMode,
+                    onOpenScrollMode = onOpenScrollMode
+                )
+            }
+        return
+    }
+
+    if (obj.className.isRenderDecoratorClass()) return
 
     val density = LocalDensity.current.density
 
@@ -223,9 +396,25 @@ fun RenderRobloxObject(
 
     // Layout configuration
     val isSelected = obj.id == selectedId
+    val tweenPreviewSpec = remember(obj.id, obj.children) { resolveLocalScriptTweenPreview(obj) }
+    val tweenTransition = rememberInfiniteTransition(label = "LocalScriptTweenPreview")
+    val tweenProgress by tweenTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 900),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "TweenPreviewProgress"
+    )
+    val tweenActive = isPreviewMode && tweenPreviewSpec.enabled
+    val tweenOffsetX = if (tweenActive && tweenPreviewSpec.movesPosition) 18f * tweenProgress else 0f
+    val tweenOffsetY = if (tweenActive && tweenPreviewSpec.movesPosition) 8f * tweenProgress else 0f
+    val tweenSizeScale = if (tweenActive && tweenPreviewSpec.resizes) 1f + (0.06f * tweenProgress) else 1f
+    val tweenAlpha = if (tweenActive && tweenPreviewSpec.fades) (1f - 0.35f * tweenProgress).coerceIn(0.2f, 1f) else 1f
 
     // Map properties to Compose graphics styling
-    val bgTrans = obj.properties["BackgroundTransparency"] as? Float ?: 0f
+    val bgTrans = obj.properties["BackgroundTransparency"] as? Float ?: if (obj.className == RobloxClass.Path2D) 1f else 0f
     val bgRaw = obj.properties["BackgroundColor3"] as? Color3 ?: Color3(163, 162, 165)
     val bgColor = Color(bgRaw.r, bgRaw.g, bgRaw.b).copy(alpha = (1.0f - bgTrans).coerceIn(0f, 1f))
 
@@ -336,15 +525,20 @@ fun RenderRobloxObject(
 
     Box(
         modifier = Modifier
-            .offset(xPx.dp, yPx.dp)
-            .size(wPx.dp, hPx.dp)
-            .graphicsLayer(scaleX = uiScale, scaleY = uiScale)
+            .offset((xPx + tweenOffsetX).dp, (yPx + tweenOffsetY).dp)
+            .size((wPx * tweenSizeScale).dp, (hPx * tweenSizeScale).dp)
+            .graphicsLayer(scaleX = uiScale, scaleY = uiScale, alpha = tweenAlpha)
             .clip(shape)
             .then(backgroundModifier)
             .then(borderModifier)
             .combinedClickable(
                 enabled = !isPreviewMode,
-                onClick = { onSelect(obj.id) },
+                onClick = {
+                    onSelect(obj.id)
+                    if (obj.className == RobloxClass.ScrollingFrame) {
+                        onOpenScrollMode(obj.id)
+                    }
+                },
                 onDoubleClick = {
                     onSelect(obj.id)
                     onToggleDragMode()
@@ -552,6 +746,9 @@ fun RenderRobloxObject(
                     )
                 }
             }
+            RobloxClass.Path2D -> {
+                Path2DPreview(obj = obj)
+            }
             RobloxClass.ViewportFrame -> {
                 var yaw by remember { mutableStateOf(0.5f) }
                 var pitch by remember { mutableStateOf(0.3f) }
@@ -701,19 +898,8 @@ fun RenderRobloxObject(
 
         // Apply Layout engines visually on preview if possible
         // For our mobile preview, we render the children recursively!
-        val nonRenderableClasses = setOf(
-            RobloxClass.UICorner,
-            RobloxClass.UIStroke,
-            RobloxClass.UIGradient,
-            RobloxClass.UIAspectRatioConstraint,
-            RobloxClass.UIScale,
-            RobloxClass.UIShadow,
-            RobloxClass.UIPadding,
-            RobloxClass.UIListLayout,
-            RobloxClass.UIGridLayout
-        )
         val childrenToRender = obj.children
-            .filter { it.className !in nonRenderableClasses }
+            .filter { !it.className.isRenderDecoratorClass() }
             .sortedWith(compareBy<RobloxObject> { it.properties["LayoutOrder"] as? Int ?: 0 }.thenBy { it.name })
         val contentPadding = resolveRenderPadding(
             paddingChild = obj.children.firstOrNull { it.className == RobloxClass.UIPadding },
@@ -815,7 +1001,8 @@ fun RenderRobloxObject(
                     gridSize = gridSize,
                     scaleFactor = scaleFactor,
                     useSingleDragMode = useSingleDragMode,
-                    onToggleDragMode = onToggleDragMode
+                    onToggleDragMode = onToggleDragMode,
+                    onOpenScrollMode = onOpenScrollMode
                 )
             }
         }
@@ -1057,9 +1244,25 @@ fun RenderRobloxObject(
                                 .size(10.dp)
                                 .background(Color(0, 162, 255), RoundedCornerShape(2.dp))
                                 .border(1.dp, Color.White, RoundedCornerShape(2.dp))
-                        )
-                    }
-                } else {
+	                        )
+	                    }
+
+	                    listOf(ResizeEdge.Left, ResizeEdge.Right, ResizeEdge.Top, ResizeEdge.Bottom).forEach { edge ->
+	                        EdgeResizeHandle(
+	                            edge = edge,
+	                            objId = obj.id,
+	                            currentPos = currentPos,
+	                            currentSize = currentSize,
+	                            density = density,
+	                            currentScaleFactor = currentScaleFactor,
+	                            currentSnapToGrid = currentSnapToGrid,
+	                            currentGridSize = currentGridSize,
+	                            currentParentW = currentParentW,
+	                            currentParentH = currentParentH,
+	                            onMoveOrResize = onMoveOrResize
+	                        )
+	                    }
+	                } else {
                     // Resize Handle dots at bottom-right corner
                     Box(
                         modifier = Modifier
@@ -1136,6 +1339,64 @@ private fun resolveRobloxImagePreviewUrl(image: String): String? {
     return assetId
         ?.takeIf { it != "0" }
         ?.let { "https://www.roblox.com/asset-thumbnail/image?assetId=$it&width=420&height=420&format=png" }
+}
+
+@Composable
+private fun Path2DPreview(obj: RobloxObject) {
+    val colorRaw = obj.properties["Color3"] as? Color3 ?: Color3(0, 162, 255)
+    val alpha = (1f - (obj.properties["Transparency"] as? Float ?: 0f)).coerceIn(0f, 1f)
+    val thickness = (obj.properties["Thickness"] as? Int ?: 4).coerceIn(1, 32)
+    val closed = obj.properties["Closed"] as? Boolean ?: false
+    val points = remember(obj.properties["ControlPoints"]) {
+        parsePath2DPreviewPoints(obj.properties["ControlPoints"] as? String)
+    }
+    val pathColor = Color(colorRaw.r, colorRaw.g, colorRaw.b).copy(alpha = alpha)
+
+    androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
+        if (points.size < 2) return@Canvas
+        val path = Path().apply {
+            val first = points.first()
+            moveTo(first.x * size.width, first.y * size.height)
+            points.drop(1).forEach { point ->
+                lineTo(point.x * size.width, point.y * size.height)
+            }
+            if (closed) close()
+        }
+        drawPath(
+            path = path,
+            color = pathColor,
+            style = Stroke(
+                width = thickness.dp.toPx(),
+                cap = StrokeCap.Round,
+                join = StrokeJoin.Round
+            )
+        )
+        points.forEach { point ->
+            val center = Offset(point.x * size.width, point.y * size.height)
+            drawCircle(Color(0xFF0B1220).copy(alpha = 0.75f), radius = (thickness + 4).dp.toPx(), center = center)
+            drawCircle(pathColor, radius = (thickness + 1).dp.toPx(), center = center)
+            drawCircle(Color.White.copy(alpha = 0.75f), radius = 2.dp.toPx(), center = center)
+        }
+    }
+}
+
+private fun parsePath2DPreviewPoints(raw: String?): List<Vector2> {
+    return raw
+        ?.split(';')
+        ?.mapNotNull { point ->
+            val parts = point.trim().split(',')
+            if (parts.size < 2) return@mapNotNull null
+            val x = parts[0].trim().toFloatOrNull()?.coerceIn(0f, 1f) ?: return@mapNotNull null
+            val y = parts[1].trim().toFloatOrNull()?.coerceIn(0f, 1f) ?: return@mapNotNull null
+            Vector2(x, y)
+        }
+        ?.takeIf { it.size >= 2 }
+        ?: listOf(
+            Vector2(0f, 0.8f),
+            Vector2(0.26f, 0.24f),
+            Vector2(0.58f, 0.66f),
+            Vector2(1f, 0.18f)
+        )
 }
 
 private data class RenderPadding(

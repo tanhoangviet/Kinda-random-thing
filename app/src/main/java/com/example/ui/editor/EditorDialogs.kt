@@ -72,10 +72,11 @@ fun InsertObjectDialog(
 ) {
     var selectedCategory by remember { mutableStateOf("Basic UI") }
     
-    val categories = listOf("Basic UI", "Text", "Image", "Layout", "Constraint", "Script", "Effects")
+    val categories = listOf("Basic UI", "Containers", "Text", "Image", "Layout", "Constraint", "Script", "Effects")
     
     val objectsForCategory = when (selectedCategory) {
-        "Basic UI" -> listOf(RobloxClass.Frame, RobloxClass.ScrollingFrame, RobloxClass.ViewportFrame)
+        "Basic UI" -> listOf(RobloxClass.Frame, RobloxClass.ScrollingFrame, RobloxClass.ViewportFrame, RobloxClass.Path2D)
+        "Containers" -> listOf(RobloxClass.ScreenGui, RobloxClass.Folder)
         "Text" -> listOf(RobloxClass.TextLabel, RobloxClass.TextButton)
         "Image" -> listOf(RobloxClass.ImageLabel, RobloxClass.ImageButton)
         "Layout" -> listOf(RobloxClass.UIListLayout, RobloxClass.UIGridLayout, RobloxClass.UIPadding)

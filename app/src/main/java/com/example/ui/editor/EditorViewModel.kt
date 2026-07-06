@@ -95,6 +95,10 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     // Undo / Redo Stacks
     private val undoStack = mutableListOf<RobloxObject>()
     private val redoStack = mutableListOf<RobloxObject>()
+    private val _canUndo = MutableStateFlow(false)
+    val canUndo: StateFlow<Boolean> = _canUndo.asStateFlow()
+    private val _canRedo = MutableStateFlow(false)
+    val canRedo: StateFlow<Boolean> = _canRedo.asStateFlow()
 
     // Clipboard
     private var clipboardObject: RobloxObject? = null
@@ -193,6 +197,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         }
         undoStack.add(_rootObject.value)
         redoStack.clear()
+        updateHistoryAvailability()
     }
 
     fun undo() {
@@ -200,6 +205,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
             val prevState = undoStack.removeAt(undoStack.size - 1)
             redoStack.add(_rootObject.value)
             _rootObject.value = prevState
+            updateHistoryAvailability()
             triggerAutosave()
         }
     }
@@ -209,8 +215,14 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
             val nextState = redoStack.removeAt(redoStack.size - 1)
             undoStack.add(_rootObject.value)
             _rootObject.value = nextState
+            updateHistoryAvailability()
             triggerAutosave()
         }
+    }
+
+    private fun updateHistoryAvailability() {
+        _canUndo.value = undoStack.isNotEmpty()
+        _canRedo.value = redoStack.isNotEmpty()
     }
 
     fun selectObject(id: String?) {
@@ -232,6 +244,12 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
 
     private val _studioTheme = MutableStateFlow(settingsPrefs.getString("studioTheme", "Studio Dark") ?: "Studio Dark")
     val studioTheme: StateFlow<String> = _studioTheme.asStateFlow()
+
+    private val _arrowControlsEnabled = MutableStateFlow(settingsPrefs.getBoolean("arrowControlsEnabled", true))
+    val arrowControlsEnabled: StateFlow<Boolean> = _arrowControlsEnabled.asStateFlow()
+
+    private val _arrowStepPx = MutableStateFlow(settingsPrefs.getInt("arrowStepPx", 5).coerceIn(1, 64))
+    val arrowStepPx: StateFlow<Int> = _arrowStepPx.asStateFlow()
 
     fun setUseSingleDragMode(enabled: Boolean) {
         _useSingleDragMode.value = enabled
@@ -256,6 +274,17 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     fun setStudioTheme(theme: String) {
         _studioTheme.value = theme
         settingsPrefs.edit().putString("studioTheme", theme).apply()
+    }
+
+    fun setArrowControlsEnabled(enabled: Boolean) {
+        _arrowControlsEnabled.value = enabled
+        settingsPrefs.edit().putBoolean("arrowControlsEnabled", enabled).apply()
+    }
+
+    fun setArrowStepPx(step: Int) {
+        val next = step.coerceIn(1, 64)
+        _arrowStepPx.value = next
+        settingsPrefs.edit().putInt("arrowStepPx", next).apply()
     }
 
     fun togglePreviewMode() {
@@ -361,6 +390,26 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
             old.copy(properties = updated)
         }
         triggerAutosave()
+    }
+
+    fun nudgeSelectedObject(deltaX: Int, deltaY: Int) {
+        val id = _selectedObjectId.value ?: return
+        val obj = findObjectById(_rootObject.value, id) ?: return
+        val pos = obj.properties["Position"] as? UDim2 ?: return
+        val size = obj.properties["Size"] as? UDim2 ?: return
+        updateTransform(id, pos.copy(offsetX = pos.offsetX + deltaX, offsetY = pos.offsetY + deltaY), size)
+    }
+
+    fun resizeSelectedObject(deltaWidth: Int, deltaHeight: Int) {
+        val id = _selectedObjectId.value ?: return
+        val obj = findObjectById(_rootObject.value, id) ?: return
+        val pos = obj.properties["Position"] as? UDim2 ?: return
+        val size = obj.properties["Size"] as? UDim2 ?: return
+        val updatedSize = size.copy(
+            offsetX = (size.offsetX + deltaWidth).coerceAtLeast(10),
+            offsetY = (size.offsetY + deltaHeight).coerceAtLeast(10)
+        )
+        updateTransform(id, pos, updatedSize)
     }
 
     fun reparentObject(id: String, targetParentId: String): Boolean {

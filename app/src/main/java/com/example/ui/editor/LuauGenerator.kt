@@ -74,6 +74,10 @@ object LuauGenerator {
                             return@forEach
                         }
                     }
+                    if (obj.className == RobloxClass.Path2D && name == "ControlPoints" && value is String) {
+                        sb.append(formatPath2DControlPoints(key, value))
+                        return@forEach
+                    }
                     val formatted = formatPropertyValue(obj.className, name, value)
                     if (formatted != null) {
                         sb.append("GUI[\"$key\"][\"$name\"] = $formatted\n")
@@ -212,6 +216,33 @@ object LuauGenerator {
         return "GUI[\"$key\"][\"Image\"] = loadCustomImage(${formatLuauString(trimmed)}, ${formatLuauString(assetPath)})\n"
     }
 
+    private fun formatPath2DControlPoints(key: String, points: String): String {
+        val parsedPoints = parsePath2DPoints(points)
+        if (parsedPoints.size < 2) {
+            return "-- Path2D ${key}: skipped control points because at least two points are required\n"
+        }
+
+        return buildString {
+            appendLine("GUI[\"$key\"]:SetControlPoints({")
+            parsedPoints.forEach { (x, y) ->
+                appendLine("\tPath2DControlPoint.new(UDim2.new(${x.toLuauNumber()}, 0, ${y.toLuauNumber()}, 0), UDim2.new(0, 0, 0, 0), UDim2.new(0, 0, 0, 0)),")
+            }
+            appendLine("})")
+        }
+    }
+
+    private fun parsePath2DPoints(points: String): List<Pair<Float, Float>> {
+        return points
+            .split(';')
+            .mapNotNull { rawPoint ->
+                val parts = rawPoint.trim().split(',')
+                if (parts.size < 2) return@mapNotNull null
+                val x = parts[0].trim().toFloatOrNull()?.coerceIn(0f, 1f) ?: return@mapNotNull null
+                val y = parts[1].trim().toFloatOrNull()?.coerceIn(0f, 1f) ?: return@mapNotNull null
+                x to y
+            }
+    }
+
     private fun appendCustomAssetLoader(sb: StringBuilder) {
         sb.appendLine("local executorEnv = getfenv() :: any")
         sb.appendLine("local writefileFn = executorEnv.writefile")
@@ -348,7 +379,10 @@ object LuauGenerator {
             RobloxClass.ImageLabel, RobloxClass.ImageButton, RobloxClass.ScrollingFrame,
             RobloxClass.ViewportFrame
         )
-        if (propName == "Visible" || propName == "Active" || propName == "ZIndex" || propName == "LayoutOrder") {
+        if (propName == "Visible" || propName == "ZIndex") {
+            return isGuiObject || className == RobloxClass.Path2D
+        }
+        if (propName == "Active" || propName == "LayoutOrder") {
             return isGuiObject
         }
         if (propName == "Size" || propName == "Position" || propName == "AnchorPoint") {
@@ -361,6 +395,7 @@ object LuauGenerator {
         
         when (className) {
             RobloxClass.ScreenGui -> return propName in listOf("ResetOnSpawn", "Enabled")
+            RobloxClass.Folder -> return false
             RobloxClass.Frame -> return propName in frameOnlyProps || propName == "ClipsDescendants"
             RobloxClass.TextLabel -> return propName in frameOnlyProps || propName in textOnlyProps
             RobloxClass.TextButton -> return propName in frameOnlyProps || propName in textOnlyProps || propName == "AutoButtonColor"
@@ -368,6 +403,7 @@ object LuauGenerator {
             RobloxClass.ImageButton -> return propName in frameOnlyProps || propName in imageOnlyProps || propName == "AutoButtonColor"
             RobloxClass.ScrollingFrame -> return propName in frameOnlyProps || propName in listOf("CanvasSize", "ScrollBarThickness", "ScrollingDirection", "ClipsDescendants")
             RobloxClass.ViewportFrame -> return propName in frameOnlyProps || propName == "ImageTransparency"
+            RobloxClass.Path2D -> return propName in listOf("Visible", "ZIndex", "Color3", "Transparency", "Thickness", "Closed", "ControlPoints")
             RobloxClass.UIListLayout -> return propName in layoutOnlyProps
             RobloxClass.UIGridLayout -> return propName in layoutOnlyProps
             RobloxClass.UIPadding -> return propName in paddingOnlyProps

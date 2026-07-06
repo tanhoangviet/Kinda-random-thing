@@ -483,7 +483,11 @@ fun RenderExplorerNode(
                         }
                         DropdownMenu(expanded = showAddMenu, onDismissRequest = { showAddMenu = false }) {
                             listOf(
+                                RobloxClass.Folder,
                                 RobloxClass.Frame,
+                                RobloxClass.ScrollingFrame,
+                                RobloxClass.ViewportFrame,
+                                RobloxClass.Path2D,
                                 RobloxClass.TextLabel,
                                 RobloxClass.TextButton,
                                 RobloxClass.ImageLabel,
@@ -629,6 +633,7 @@ fun RenderExplorerNode(
 fun getClassEmojiIcon(className: RobloxClass): String {
     return when (className) {
         RobloxClass.ScreenGui -> "🖥️"
+        RobloxClass.Folder -> "📁"
         RobloxClass.Frame -> "🔲"
         RobloxClass.TextLabel -> "🔤"
         RobloxClass.TextButton -> "🔘"
@@ -636,6 +641,7 @@ fun getClassEmojiIcon(className: RobloxClass): String {
         RobloxClass.ImageButton -> "🖱️"
         RobloxClass.ScrollingFrame -> "📜"
         RobloxClass.ViewportFrame -> "👁️"
+        RobloxClass.Path2D -> "〰️"
         RobloxClass.UIListLayout -> "🗂️"
         RobloxClass.UIGridLayout -> "🎛️"
         RobloxClass.UIPadding -> "📦"

@@ -157,7 +157,7 @@ fun PropertiesPanel(
             val isGuiObject = selectedObj.className in listOf(
                 RobloxClass.Frame, RobloxClass.TextLabel, RobloxClass.TextButton,
                 RobloxClass.ImageLabel, RobloxClass.ImageButton, RobloxClass.ScrollingFrame,
-                RobloxClass.ViewportFrame
+                RobloxClass.ViewportFrame, RobloxClass.Path2D
             )
 
             if (isGuiObject) {
@@ -170,13 +170,15 @@ fun PropertiesPanel(
                     )
                 }
 
-                val active = selectedObj.properties["Active"] as? Boolean ?: true
-                PropertyRow(label = "Active") {
-                    Switch(
-                        checked = active,
-                        onCheckedChange = { onUpdateProperty(selectedObj.id, "Active", it) },
-                        modifier = Modifier.scale(0.7f)
-                    )
+                if (selectedObj.className != RobloxClass.Path2D) {
+                    val active = selectedObj.properties["Active"] as? Boolean ?: true
+                    PropertyRow(label = "Active") {
+                        Switch(
+                            checked = active,
+                            onCheckedChange = { onUpdateProperty(selectedObj.id, "Active", it) },
+                            modifier = Modifier.scale(0.7f)
+                        )
+                    }
                 }
 
                 val zIndex = selectedObj.properties["ZIndex"] as? Int ?: 1
@@ -209,7 +211,7 @@ fun PropertiesPanel(
         val hasSizeAndPos = selectedObj.className in listOf(
             RobloxClass.Frame, RobloxClass.TextLabel, RobloxClass.TextButton,
             RobloxClass.ImageLabel, RobloxClass.ImageButton, RobloxClass.ScrollingFrame,
-            RobloxClass.ViewportFrame
+            RobloxClass.ViewportFrame, RobloxClass.Path2D
         )
         if (hasSizeAndPos) {
             PropertySection(title = Locales.translate("transform", lang)) {
@@ -431,6 +433,20 @@ fun PropertiesPanel(
                 }
             }
 
+            if (selectedObj.properties.containsKey("Color3") && selectedObj.properties["Color3"] is Color3) {
+                val col = selectedObj.properties["Color3"] as? Color3 ?: Color3(255, 255, 255)
+                PropertyRow(label = "Color3") {
+                    Box(
+                        modifier = Modifier
+                            .size(34.dp, 22.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(Color(col.r, col.g, col.b))
+                            .border(1.dp, Color.Gray, RoundedCornerShape(4.dp))
+                            .clickable { activeColorProp = Pair("Color3", col) }
+                    )
+                }
+            }
+
             if (selectedObj.properties.containsKey("Transparency") && selectedObj.properties["Transparency"] is Float) {
                 val trans = selectedObj.properties["Transparency"] as? Float ?: 0f
                 PropertyRow(label = "Transparency") {
@@ -448,6 +464,40 @@ fun PropertiesPanel(
                             fontSize = 9.sp
                         )
                     }
+                }
+            }
+        }
+
+        if (selectedObj.className == RobloxClass.Path2D) {
+            PropertySection(title = "Path2D") {
+                val closed = selectedObj.properties["Closed"] as? Boolean ?: false
+                PropertyRow(label = "Closed") {
+                    Switch(
+                        checked = closed,
+                        onCheckedChange = { onUpdateProperty(selectedObj.id, "Closed", it) },
+                        modifier = Modifier.scale(0.7f)
+                    )
+                }
+
+                val thickness = selectedObj.properties["Thickness"] as? Int ?: 4
+                PropertyRow(label = "Thickness") {
+                    StepperInput(
+                        value = thickness,
+                        onValueChange = { onUpdateProperty(selectedObj.id, "Thickness", it) },
+                        min = 1,
+                        max = 32
+                    )
+                }
+
+                val points = selectedObj.properties["ControlPoints"] as? String ?: "0.00,0.80;0.26,0.24;0.58,0.66;1.00,0.18"
+                PropertyRow(label = "Points") {
+                    RobloxTextField(
+                        value = points,
+                        onValueChange = { onUpdateProperty(selectedObj.id, "ControlPoints", it) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(30.dp)
+                    )
                 }
             }
         }
