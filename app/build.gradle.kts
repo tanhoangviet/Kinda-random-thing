@@ -75,7 +75,7 @@ val generateVanillaRenderPack by tasks.registering {
 
   doLast {
     val file = outputFile.get().asFile
-    val targetBytes = 124 * 1024 * 1024
+    val targetBytes = 120 * 1024 * 1024
     if (file.exists() && file.length() == targetBytes.toLong()) {
       return@doLast
     }
