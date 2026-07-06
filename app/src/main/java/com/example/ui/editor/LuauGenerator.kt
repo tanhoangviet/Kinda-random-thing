@@ -66,21 +66,22 @@ object LuauGenerator {
             
             // Assign properties
             obj.properties.forEach { (name, value) ->
-                if (isPropertyRelevant(obj.className, name)) {
-                    if (obj.className in listOf(RobloxClass.ImageLabel, RobloxClass.ImageButton) && name == "Image" && value is String) {
+                val exportName = normalizeExportPropertyName(obj.className, name)
+                if (isPropertyRelevant(obj.className, exportName)) {
+                    if (obj.className in listOf(RobloxClass.ImageLabel, RobloxClass.ImageButton) && exportName == "Image" && value is String) {
                         val customAssetCode = formatCustomImageAssetAssignment(key, value)
                         if (customAssetCode != null) {
                             sb.append(customAssetCode)
                             return@forEach
                         }
                     }
-                    if (obj.className == RobloxClass.Path2D && name == "ControlPoints" && value is String) {
+                    if (obj.className == RobloxClass.Path2D && exportName == "ControlPoints" && value is String) {
                         sb.append(formatPath2DControlPoints(key, value))
                         return@forEach
                     }
-                    val formatted = formatPropertyValue(obj.className, name, value)
+                    val formatted = formatPropertyValue(obj.className, exportName, value)
                     if (formatted != null) {
-                        sb.append("GUI[\"$key\"][\"$name\"] = $formatted\n")
+                        sb.append("GUI[\"$key\"][\"$exportName\"] = $formatted\n")
                     }
                 }
             }
@@ -161,6 +162,52 @@ object LuauGenerator {
             "ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(150, 150, 150))"
         }
     }
+
+    private fun normalizeExportPropertyName(className: RobloxClass, propName: String): String {
+        if (className != RobloxClass.UICorner) return propName
+        return when (propName) {
+            "TopLeft" -> "TopLeftRadius"
+            "TopRight" -> "TopRightRadius"
+            "BottomLeft" -> "BottomLeftRadius"
+            "BottomRight" -> "BottomRightRadius"
+            else -> propName
+        }
+    }
+
+    private fun formatNumberSequence(sequenceStr: String): String {
+        return try {
+            val keypoints = sequenceStr
+                .split(';')
+                .mapNotNull { part ->
+                    val segments = part.split(':')
+                    if (segments.size < 2) return@mapNotNull null
+                    val time = segments[0].trim().toFloatOrNull()?.coerceIn(0f, 1f) ?: return@mapNotNull null
+                    val value = segments[1].trim().toFloatOrNull()?.coerceIn(0f, 1f) ?: return@mapNotNull null
+                    time to value
+                }
+                .distinctBy { it.first }
+                .sortedBy { it.first }
+                .toMutableList()
+
+            if (keypoints.isEmpty()) {
+                keypoints.add(0f to 0f)
+                keypoints.add(1f to 0f)
+            }
+            if (keypoints.first().first != 0f) {
+                keypoints.add(0, 0f to keypoints.first().second)
+            }
+            if (keypoints.last().first != 1f) {
+                keypoints.add(1f to keypoints.last().second)
+            }
+
+            val formatted = keypoints.joinToString(",\n\t") { (time, value) ->
+                "NumberSequenceKeypoint.new(${time.toLuauNumber()}, ${value.toLuauNumber()})"
+            }
+            "NumberSequence.new({\n\t$formatted\n})"
+        } catch (e: Exception) {
+            "NumberSequence.new(0)"
+        }
+    }
     
     private fun formatPropertyValue(className: RobloxClass, propName: String, value: Any): String? {
         if (className == RobloxClass.UIGradient && propName == "Color" && value is String) {
@@ -168,6 +215,9 @@ object LuauGenerator {
         }
         if (className == RobloxClass.UIGradient && propName == "Transparency" && value is Number) {
             return "NumberSequence.new(${value.toLuauNumber()})"
+        }
+        if (className == RobloxClass.UIGradient && propName == "Transparency" && value is String) {
+            return formatNumberSequence(value)
         }
         if (isUDimProperty(className, propName) && value is UDim2) {
             return formatUDim(propName, value)
@@ -275,7 +325,13 @@ object LuauGenerator {
         return when (className) {
             RobloxClass.UIListLayout -> propName == "Padding"
             RobloxClass.UIPadding -> propName in listOf("PaddingTop", "PaddingBottom", "PaddingLeft", "PaddingRight")
-            RobloxClass.UICorner -> propName == "CornerRadius"
+            RobloxClass.UICorner -> propName in listOf(
+                "CornerRadius",
+                "TopLeftRadius",
+                "TopRightRadius",
+                "BottomLeftRadius",
+                "BottomRightRadius"
+            )
             else -> false
         }
     }
@@ -367,7 +423,13 @@ object LuauGenerator {
     private fun isPropertyRelevant(className: RobloxClass, propName: String): Boolean {
         val layoutOnlyProps = listOf("FillDirection", "HorizontalAlignment", "VerticalAlignment", "Padding", "SortOrder", "CellPadding", "CellSize")
         val paddingOnlyProps = listOf("PaddingTop", "PaddingBottom", "PaddingLeft", "PaddingRight")
-        val cornerOnlyProps = listOf("CornerRadius")
+        val cornerOnlyProps = listOf(
+            "CornerRadius",
+            "TopLeftRadius",
+            "TopRightRadius",
+            "BottomLeftRadius",
+            "BottomRightRadius"
+        )
         val strokeOnlyProps = listOf("Color", "Thickness", "Transparency", "ApplyStrokeMode")
         val textOnlyProps = listOf("Text", "TextColor3", "TextSize", "TextTransparency", "TextWrapped", "TextScaled", "Font", "TextXAlignment", "TextYAlignment", "RichText")
         val imageOnlyProps = listOf("Image", "ImageTransparency", "ScaleType")

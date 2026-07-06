@@ -593,6 +593,7 @@ fun MainWorkspace(
                 VSCodeEditorScreen(
                     scriptName = scriptObj.name,
                     className = scriptObj.className,
+                    contextClassName = viewModel.findParentOfObject(rootObj, scriptId)?.className,
                     initialSource = scriptObj.properties["Source"] as? String ?: "",
                     onSave = { newSrc -> viewModel.updateProperty(scriptId, "Source", newSrc) },
                     onBack = { viewModel.closeScriptEditor() }

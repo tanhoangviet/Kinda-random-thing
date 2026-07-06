@@ -42,6 +42,7 @@ import com.example.data.model.RobloxClass
 fun VSCodeEditorScreen(
     scriptName: String,
     className: RobloxClass,
+    contextClassName: RobloxClass? = null,
     initialSource: String,
     onSave: (String) -> Unit,
     onBack: () -> Unit
@@ -56,6 +57,7 @@ fun VSCodeEditorScreen(
     val horizontalScroll = rememberScrollState()
     val scriptKind = if (className == RobloxClass.LocalScript) "LocalScript" else "ModuleScript"
     val fileName = if (className == RobloxClass.LocalScript) "$scriptName.client.lua" else "$scriptName.lua"
+    val isPath2DContext = className == RobloxClass.LocalScript && contextClassName == RobloxClass.Path2D
     val configuration = LocalConfiguration.current
     val isCompact = configuration.screenWidthDp < 900 || configuration.screenHeightDp < 520
     val sidebarWidth = if (isCompact) 168.dp else 224.dp
@@ -168,13 +170,21 @@ fun VSCodeEditorScreen(
 
                 EditorMetric("Lines", lineCount.toString())
                 EditorMetric("Chars", sourceText.length.toString())
-                EditorMetric("Mode", "Luau")
+                EditorMetric("Mode", if (isPath2DContext) "Path2D" else "Luau")
+                EditorMetric("Context", contextClassName?.name ?: "None")
 
                 Text("SNIPPETS", color = Color(0xFF8C929C), fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
+                SnippetButton("example code") { sourceText = localScriptExampleCode(scriptName, contextClassName, className) }
                 SnippetButton("print") { sourceText += "\nprint(\"Hello from $scriptName\")" }
                 SnippetButton("task.wait") { sourceText += "\ntask.wait(1)" }
                 if (className == RobloxClass.LocalScript) {
                     SnippetButton("PlayerGui") { sourceText += "\nlocal playerGui = game.Players.LocalPlayer:WaitForChild(\"PlayerGui\")" }
+                    SnippetButton("GUI tween") { sourceText += "\n\n" + guiTweenSnippet() }
+                    if (isPath2DContext) {
+                        Text("PATH2D HELPERS", color = Color(0xFF8C929C), fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 4.dp))
+                        SnippetButton("path animate") { sourceText = path2DAnimationSnippet() }
+                        SnippetButton("path sample") { sourceText += "\n\n" + path2DSampleSnippet() }
+                    }
                 } else {
                     SnippetButton("module fn") { sourceText += "\nfunction Module.new()\n\treturn {}\nend" }
                 }
@@ -321,4 +331,113 @@ private fun EditorMetric(label: String, value: String) {
 @Composable
 private fun EditorTrafficDot(color: Color) {
     Box(modifier = Modifier.size(12.dp).background(color, CircleShape))
+}
+
+private fun localScriptExampleCode(
+    scriptName: String,
+    contextClassName: RobloxClass?,
+    className: RobloxClass
+): String {
+    if (className == RobloxClass.ModuleScript) {
+        return """
+--!strict
+local ${scriptName.replace("[^A-Za-z0-9_]".toRegex(), "").ifBlank { "Module" }} = {}
+
+function ${scriptName.replace("[^A-Za-z0-9_]".toRegex(), "").ifBlank { "Module" }}.init()
+	print("Module ready")
+end
+
+return ${scriptName.replace("[^A-Za-z0-9_]".toRegex(), "").ifBlank { "Module" }}
+""".trimIndent()
+    }
+
+    return if (contextClassName == RobloxClass.Path2D) {
+        path2DAnimationSnippet()
+    } else {
+        """
+--!strict
+local TweenService = game:GetService("TweenService")
+
+local guiObject = script.Parent :: GuiObject
+local tweenInfo = TweenInfo.new(0.28, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+local originalSize = guiObject.Size
+
+local pulse = TweenService:Create(guiObject, tweenInfo, {
+	Size = originalSize + UDim2.fromOffset(10, 6),
+	BackgroundTransparency = 0.08,
+})
+
+pulse:Play()
+""".trimIndent()
+    }
+}
+
+private fun guiTweenSnippet(): String {
+    return """
+local TweenService = game:GetService("TweenService")
+local guiObject = script.Parent :: GuiObject
+
+local tween = TweenService:Create(guiObject, TweenInfo.new(0.35), {
+	Position = guiObject.Position + UDim2.fromOffset(0, -12),
+})
+
+tween:Play()
+""".trimIndent()
+}
+
+private fun path2DSampleSnippet(): String {
+    return """
+local path = script.Parent :: Path2D
+
+local ok, position = pcall(function()
+	return path:GetPositionOnCurveArcLength(0.5)
+end)
+
+if ok then
+	print("Midpoint", position)
+end
+""".trimIndent()
+}
+
+private fun path2DAnimationSnippet(): String {
+    return """
+--!strict
+local RunService = game:GetService("RunService")
+
+local path = script.Parent :: Path2D
+local marker = Instance.new("Frame")
+marker.Name = "PathMarker"
+marker.Size = UDim2.fromOffset(14, 14)
+marker.AnchorPoint = Vector2.new(0.5, 0.5)
+marker.BackgroundColor3 = path.Color3
+marker.BorderSizePixel = 0
+marker.Parent = path.Parent
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(1, 0)
+corner.Parent = marker
+
+local elapsed = 0
+local connection: RBXScriptConnection?
+
+connection = RunService.RenderStepped:Connect(function(deltaTime)
+	elapsed += deltaTime
+	local alpha = (math.sin(elapsed * 1.6) + 1) / 2
+
+	local ok, position = pcall(function()
+		return path:GetPositionOnCurveArcLength(alpha)
+	end)
+
+	if ok then
+		marker.Position = position
+	end
+end)
+
+script.Destroying:Connect(function()
+	if connection then
+		connection:Disconnect()
+	end
+	marker:Destroy()
+end)
+""".trimIndent()
 }

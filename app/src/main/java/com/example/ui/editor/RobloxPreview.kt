@@ -422,10 +422,18 @@ fun RenderRobloxObject(
     val cornerChild = obj.children.firstOrNull { it.className == RobloxClass.UICorner }
     val shape = if (cornerChild != null) {
         val r = cornerChild.properties["CornerRadius"] as? UDim2 ?: UDim2(0f, 8, 0f, 8)
-        val topLeft = cornerChild.properties["TopLeft"] as? UDim2 ?: r
-        val topRight = cornerChild.properties["TopRight"] as? UDim2 ?: r
-        val bottomLeft = cornerChild.properties["BottomLeft"] as? UDim2 ?: r
-        val bottomRight = cornerChild.properties["BottomRight"] as? UDim2 ?: r
+        val topLeft = cornerChild.properties["TopLeftRadius"] as? UDim2
+            ?: cornerChild.properties["TopLeft"] as? UDim2
+            ?: r
+        val topRight = cornerChild.properties["TopRightRadius"] as? UDim2
+            ?: cornerChild.properties["TopRight"] as? UDim2
+            ?: r
+        val bottomLeft = cornerChild.properties["BottomLeftRadius"] as? UDim2
+            ?: cornerChild.properties["BottomLeft"] as? UDim2
+            ?: r
+        val bottomRight = cornerChild.properties["BottomRightRadius"] as? UDim2
+            ?: cornerChild.properties["BottomRight"] as? UDim2
+            ?: r
 
         RoundedCornerShape(
             topStart = topLeft.offsetX.dp,
@@ -442,26 +450,17 @@ fun RenderRobloxObject(
     val backgroundModifier = if (gradientChild != null) {
         val colorStr = gradientChild.properties["Color"] as? String ?: "255,255,255 to 150,150,150"
         val rotation = (gradientChild.properties["Rotation"] as? Float ?: 0f) % 360f
-        val gradientAlpha = (1f - (gradientChild.properties["Transparency"] as? Float ?: 0f)).coerceIn(0f, 1f)
 
-        val colorStops = try {
-            if (colorStr.contains(";")) {
-                colorStr.split(";").map { part ->
-                    val segments = part.split(":")
-                    val pos = segments[0].toFloat().coerceIn(0f, 1f)
-                    val rgb = segments[1].split(",").map { it.trim().toInt() }
-                    pos to Color(rgb[0], rgb[1], rgb[2]).copy(alpha = gradientAlpha)
-                }.sortedBy { it.first }.toTypedArray()
-            } else {
-                val colors = colorStr.split(" to ").map { part ->
-                    val rgb = part.split(",").map { it.trim().toInt() }
-                    Color(rgb[0], rgb[1], rgb[2]).copy(alpha = gradientAlpha)
-                }
-                arrayOf(0f to colors[0], 1f to colors[1])
-            }
-        } catch (e: Exception) {
-            arrayOf(0f to Color.White, 1f to Color.Gray)
-        }
+        val parsedColors = parseGradientColorStops(colorStr)
+        val parsedTransparency = parseNumberSequenceStops(gradientChild.properties["Transparency"])
+        val combinedPositions = (parsedColors.map { it.first } + parsedTransparency.map { it.first } + listOf(0f, 1f))
+            .distinct()
+            .sorted()
+        val colorStops = combinedPositions.map { position ->
+            val color = interpolateGradientColor(parsedColors, position)
+            val alpha = (1f - interpolateNumberSequence(parsedTransparency, position)).coerceIn(0f, 1f)
+            position to color.copy(alpha = alpha)
+        }.toTypedArray()
 
         // Calculate gradient start and end based on rotation
         val angleRad = (rotation - 90f) * (PI.toFloat() / 180f)
@@ -1339,6 +1338,93 @@ private fun resolveRobloxImagePreviewUrl(image: String): String? {
     return assetId
         ?.takeIf { it != "0" }
         ?.let { "https://www.roblox.com/asset-thumbnail/image?assetId=$it&width=420&height=420&format=png" }
+}
+
+private fun parseGradientColorStops(raw: String): List<Pair<Float, Color>> {
+    return try {
+        if (raw.contains(";")) {
+            raw.split(";").mapNotNull { part ->
+                val segments = part.split(":")
+                if (segments.size < 2) return@mapNotNull null
+                val position = segments[0].trim().toFloatOrNull()?.coerceIn(0f, 1f) ?: return@mapNotNull null
+                val rgb = segments[1].split(",").map { it.trim().toInt() }
+                if (rgb.size < 3) return@mapNotNull null
+                position to Color(rgb[0].coerceIn(0, 255), rgb[1].coerceIn(0, 255), rgb[2].coerceIn(0, 255))
+            }.takeIf { it.isNotEmpty() }?.sortedBy { it.first }
+                ?: listOf(0f to Color.White, 1f to Color.Gray)
+        } else {
+            val colors = raw.split(" to ").map { part ->
+                val rgb = part.split(",").map { it.trim().toInt() }
+                Color(rgb[0].coerceIn(0, 255), rgb[1].coerceIn(0, 255), rgb[2].coerceIn(0, 255))
+            }
+            listOf(0f to colors[0], 1f to colors[1])
+        }
+    } catch (e: Exception) {
+        listOf(0f to Color.White, 1f to Color.Gray)
+    }
+}
+
+private fun parseNumberSequenceStops(raw: Any?): List<Pair<Float, Float>> {
+    val stops = when (raw) {
+        is Number -> listOf(0f to raw.toFloat().coerceIn(0f, 1f), 1f to raw.toFloat().coerceIn(0f, 1f))
+        is String -> raw.split(";").mapNotNull { part ->
+            val segments = part.split(":")
+            if (segments.size < 2) return@mapNotNull null
+            val position = segments[0].trim().toFloatOrNull()?.coerceIn(0f, 1f) ?: return@mapNotNull null
+            val value = segments[1].trim().toFloatOrNull()?.coerceIn(0f, 1f) ?: return@mapNotNull null
+            position to value
+        }
+        else -> emptyList()
+    }.sortedBy { it.first }
+
+    if (stops.isEmpty()) return listOf(0f to 0f, 1f to 0f)
+    val normalized = stops.toMutableList()
+    if (normalized.first().first != 0f) {
+        normalized.add(0, 0f to normalized.first().second)
+    }
+    if (normalized.last().first != 1f) {
+        normalized.add(1f to normalized.last().second)
+    }
+    return normalized
+}
+
+private fun interpolateGradientColor(stops: List<Pair<Float, Color>>, position: Float): Color {
+    if (stops.isEmpty()) return Color.White
+    if (position <= stops.first().first) return stops.first().second
+    if (position >= stops.last().first) return stops.last().second
+
+    for (i in 0 until stops.size - 1) {
+        val start = stops[i]
+        val end = stops[i + 1]
+        if (position >= start.first && position <= end.first) {
+            val span = (end.first - start.first).coerceAtLeast(0.0001f)
+            val t = (position - start.first) / span
+            return Color(
+                red = start.second.red + (end.second.red - start.second.red) * t,
+                green = start.second.green + (end.second.green - start.second.green) * t,
+                blue = start.second.blue + (end.second.blue - start.second.blue) * t,
+                alpha = start.second.alpha + (end.second.alpha - start.second.alpha) * t
+            )
+        }
+    }
+    return stops.last().second
+}
+
+private fun interpolateNumberSequence(stops: List<Pair<Float, Float>>, position: Float): Float {
+    if (stops.isEmpty()) return 0f
+    if (position <= stops.first().first) return stops.first().second
+    if (position >= stops.last().first) return stops.last().second
+
+    for (i in 0 until stops.size - 1) {
+        val start = stops[i]
+        val end = stops[i + 1]
+        if (position >= start.first && position <= end.first) {
+            val span = (end.first - start.first).coerceAtLeast(0.0001f)
+            val t = (position - start.first) / span
+            return start.second + (end.second - start.second) * t
+        }
+    }
+    return 0f
 }
 
 @Composable

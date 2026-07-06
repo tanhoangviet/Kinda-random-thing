@@ -58,6 +58,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.data.model.Color3
 import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.roundToInt
@@ -1418,6 +1419,249 @@ fun GradientPickerDialog(
 }
 
 @Composable
+fun NumberSequencePickerDialog(
+    initialSequence: Any?,
+    title: String,
+    onDismiss: () -> Unit,
+    onSave: (String) -> Unit
+) {
+    var stops by remember(initialSequence) { mutableStateOf(parseNumberSequenceEditorStops(initialSequence)) }
+    var selectedIndex by remember { mutableStateOf(0) }
+    var offsetX by remember { mutableStateOf(0f) }
+    var offsetY by remember { mutableStateOf(0f) }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Card(
+            shape = RoundedCornerShape(6.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF161A21)),
+            border = BorderStroke(1.dp, Color(0xFF333A45)),
+            modifier = Modifier
+                .fillMaxWidth(0.46f)
+                .widthIn(max = 430.dp)
+                .padding(8.dp)
+                .offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) }
+        ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(42.dp)
+                        .background(Color(0xFF1E232B))
+                        .pointerInput(Unit) {
+                            detectDragGestures { change, dragAmount ->
+                                change.consume()
+                                offsetX += dragAmount.x
+                                offsetY += dragAmount.y
+                            }
+                        }
+                        .padding(horizontal = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(title, color = Color(0xFFF4F7FB), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.weight(1f))
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(36.dp)) {
+                        Icon(Icons.Default.Close, contentDescription = "Close", tint = Color(0xFFA8B0BC), modifier = Modifier.size(16.dp))
+                    }
+                }
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    BoxWithConstraints(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(72.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color(0xFF0F1319))
+                            .border(1.dp, Color(0xFF303743), RoundedCornerShape(6.dp))
+                            .pointerInput(stops) {
+                                detectTapGestures { tap ->
+                                    val position = (tap.x / size.width.toFloat()).coerceIn(0f, 1f)
+                                    val nearest = stops.indexOfFirst { abs(it.position - position) < 0.045f }
+                                    if (nearest >= 0) {
+                                        selectedIndex = nearest
+                                    } else {
+                                        val value = interpolateNumberSequenceEditor(stops, position)
+                                        val updated = (stops + NumberSequenceStop(position, value))
+                                            .sortedBy { it.position }
+                                            .take(12)
+                                        stops = normalizeNumberSequenceEditorStops(updated)
+                                        selectedIndex = stops.indexOfFirst { abs(it.position - position) < 0.004f }
+                                            .coerceIn(0, stops.lastIndex)
+                                    }
+                                }
+                            }
+                    ) {
+                        val trackWidthPx = constraints.maxWidth.toFloat()
+                        Canvas(modifier = Modifier.fillMaxSize()) {
+                            val cell = 7.dp.toPx()
+                            var y = 0f
+                            var row = 0
+                            while (y < size.height) {
+                                var x = 0f
+                                var col = 0
+                                while (x < size.width) {
+                                    drawRect(
+                                        color = if ((row + col) % 2 == 0) Color(0xFF2B3340) else Color(0xFF131820),
+                                        topLeft = Offset(x, y),
+                                        size = Size(cell, cell)
+                                    )
+                                    x += cell
+                                    col += 1
+                                }
+                                y += cell
+                                row += 1
+                            }
+                            drawRect(
+                                brush = Brush.horizontalGradient(
+                                    colorStops = stops.map { stop ->
+                                        stop.position to Color(0xFF0A84FF).copy(alpha = (1f - stop.value).coerceIn(0f, 1f))
+                                    }.toTypedArray()
+                                )
+                            )
+                        }
+
+                        stops.forEachIndexed { index, stop ->
+                            val selected = index == selectedIndex
+                            Box(
+                                modifier = Modifier
+                                    .offset(x = (stop.position * maxWidth.value).dp - 10.dp)
+                                    .size(22.dp)
+                                    .align(Alignment.BottomStart)
+                                    .background(if (selected) Color.White else Color(0xFF202631), CircleShape)
+                                    .border(2.dp, if (selected) Color(0xFF0A84FF) else Color(0xFF8E96A3), CircleShape)
+                                    .pointerInput(index, stops) {
+                                        detectDragGestures(
+                                            onDragStart = { selectedIndex = index },
+                                            onDrag = { change, dragAmount ->
+                                                change.consume()
+                                                val nextPosition = (stops[index].position + dragAmount.x / trackWidthPx)
+                                                    .coerceIn(0f, 1f)
+                                                val updated = stops.toMutableList().apply {
+                                                    this[index] = this[index].copy(position = nextPosition)
+                                                }.sortedBy { it.position }
+                                                stops = normalizeNumberSequenceEditorStops(updated)
+                                                selectedIndex = stops.indexOfFirst {
+                                                    abs(it.position - nextPosition) < 0.006f &&
+                                                        abs(it.value - stop.value) < 0.006f
+                                                }.coerceIn(0, stops.lastIndex)
+                                            }
+                                        )
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("${(stop.value * 100).roundToInt()}", color = Color(0xFF0F1319), fontSize = 7.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+
+                    val current = stops.getOrNull(selectedIndex) ?: NumberSequenceStop(0f, 0f)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Key ${selectedIndex + 1}", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.weight(1f))
+                        Text(
+                            "T ${(current.position * 100).roundToInt()}%  /  Alpha ${(current.value * 100).roundToInt()}%",
+                            color = Color(0xFF8E96A3),
+                            fontSize = 10.sp
+                        )
+                    }
+
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("Position", color = Color(0xFFC6CED8), fontSize = 10.sp)
+                        Slider(
+                            value = current.position,
+                            onValueChange = { newPosition ->
+                                stops = normalizeNumberSequenceEditorStops(stops.toMutableList().apply {
+                                    this[selectedIndex] = this[selectedIndex].copy(position = newPosition)
+                                }.sortedBy { it.position })
+                                selectedIndex = stops.indexOfFirst { abs(it.position - newPosition) < 0.006f }
+                                    .coerceIn(0, stops.lastIndex)
+                            },
+                            valueRange = 0f..1f
+                        )
+                    }
+
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("Transparency Value", color = Color(0xFFC6CED8), fontSize = 10.sp)
+                        UpgradedSlider(
+                            value = current.value,
+                            onValueChange = { newValue ->
+                                stops = stops.toMutableList().apply {
+                                    this[selectedIndex] = this[selectedIndex].copy(value = newValue.coerceIn(0f, 1f))
+                                }
+                            },
+                            range = 0f..1f,
+                            trackBrush = Brush.horizontalGradient(
+                                listOf(Color(0xFF0A84FF), Color(0xFF0A84FF).copy(alpha = 0f))
+                            )
+                        )
+                    }
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        OutlinedButton(
+                            onClick = {
+                                val insertAfter = selectedIndex.coerceIn(0, stops.lastIndex)
+                                val base = stops[insertAfter]
+                                val nextPosition = (base.position + 0.12f).coerceIn(0f, 1f)
+                                stops = normalizeNumberSequenceEditorStops(
+                                    (stops + NumberSequenceStop(nextPosition, base.value)).sortedBy { it.position }
+                                ).take(12)
+                                selectedIndex = stops.indexOfFirst { abs(it.position - nextPosition) < 0.006f }
+                                    .coerceIn(0, stops.lastIndex)
+                            },
+                            modifier = Modifier.weight(1f).height(34.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                        ) {
+                            Text("Add Key", fontSize = 10.sp)
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                if (stops.size > 2) {
+                                    stops = stops.toMutableList().apply { removeAt(selectedIndex) }
+                                    selectedIndex = (selectedIndex - 1).coerceAtLeast(0)
+                                }
+                            },
+                            modifier = Modifier.weight(1f).height(34.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                        ) {
+                            Text("Remove", fontSize = 10.sp)
+                        }
+                    }
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp)
+                        .background(Color(0xFF11151B))
+                        .padding(horizontal = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    StudioGhostButton("Cancel", onDismiss)
+                    StudioPrimaryButton(
+                        label = "Save",
+                        onClick = {
+                            val result = normalizeNumberSequenceEditorStops(stops).joinToString(";") { stop ->
+                                "${String.format("%.3f", stop.position)}:${String.format("%.3f", stop.value)}"
+                            }
+                            onSave(result)
+                            onDismiss()
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun CircularColorWheel(
     hue: Float,
     saturation: Float,
@@ -1675,6 +1919,63 @@ private fun hexToColor(hex: String): Color? {
     } catch (e: Exception) {
         null
     }
+}
+
+private data class NumberSequenceStop(val position: Float, val value: Float)
+
+private fun parseNumberSequenceEditorStops(raw: Any?): List<NumberSequenceStop> {
+    val parsed = when (raw) {
+        is Number -> listOf(
+            NumberSequenceStop(0f, raw.toFloat().coerceIn(0f, 1f)),
+            NumberSequenceStop(1f, raw.toFloat().coerceIn(0f, 1f))
+        )
+        is String -> raw.split(";").mapNotNull { part ->
+            val segments = part.split(":")
+            if (segments.size < 2) return@mapNotNull null
+            val position = segments[0].trim().toFloatOrNull()?.coerceIn(0f, 1f) ?: return@mapNotNull null
+            val value = segments[1].trim().toFloatOrNull()?.coerceIn(0f, 1f) ?: return@mapNotNull null
+            NumberSequenceStop(position, value)
+        }
+        else -> emptyList()
+    }
+    return normalizeNumberSequenceEditorStops(parsed.ifEmpty {
+        listOf(NumberSequenceStop(0f, 0f), NumberSequenceStop(1f, 0f))
+    })
+}
+
+private fun normalizeNumberSequenceEditorStops(stops: List<NumberSequenceStop>): List<NumberSequenceStop> {
+    val normalized = stops
+        .map { it.copy(position = it.position.coerceIn(0f, 1f), value = it.value.coerceIn(0f, 1f)) }
+        .sortedBy { it.position }
+        .toMutableList()
+
+    if (normalized.isEmpty()) {
+        return listOf(NumberSequenceStop(0f, 0f), NumberSequenceStop(1f, 0f))
+    }
+    if (normalized.first().position != 0f) {
+        normalized.add(0, normalized.first().copy(position = 0f))
+    }
+    if (normalized.last().position != 1f) {
+        normalized.add(normalized.last().copy(position = 1f))
+    }
+    return normalized
+}
+
+private fun interpolateNumberSequenceEditor(stops: List<NumberSequenceStop>, position: Float): Float {
+    if (stops.isEmpty()) return 0f
+    if (position <= stops.first().position) return stops.first().value
+    if (position >= stops.last().position) return stops.last().value
+
+    for (i in 0 until stops.size - 1) {
+        val start = stops[i]
+        val end = stops[i + 1]
+        if (position >= start.position && position <= end.position) {
+            val span = (end.position - start.position).coerceAtLeast(0.0001f)
+            val alpha = (position - start.position) / span
+            return start.value + (end.value - start.value) * alpha
+        }
+    }
+    return 0f
 }
 
 data class GradientStop(val position: Float, val color: Color)

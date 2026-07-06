@@ -3,11 +3,15 @@ package com.example.ui.editor
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -17,9 +21,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -27,6 +33,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.data.model.*
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 @Composable
 fun PropertiesPanel(
@@ -76,6 +84,7 @@ fun PropertiesPanel(
     val scrollState = rememberScrollState()
     var activeColorProp by remember { mutableStateOf<Pair<String, Color3>?>(null) } // (propName, Color3)
     var activeGradientProp by remember { mutableStateOf<Pair<String, String>?>(null) } // (propName, String)
+    var activeNumberSequenceProp by remember { mutableStateOf<Pair<String, Any?>?>(null) } // (propName, raw sequence)
 
     Column(
         modifier = modifier
@@ -358,6 +367,16 @@ fun PropertiesPanel(
                     }
                 }
 
+                val transparencyRaw = selectedObj.properties["Transparency"]
+                val transparencyStops = remember(transparencyRaw) { parseNumberSequencePreviewStops(transparencyRaw) }
+                PropertyRow(label = "Transparency") {
+                    TransparencySequenceStrip(
+                        stops = transparencyStops,
+                        onClick = { activeNumberSequenceProp = "Transparency" to transparencyRaw },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
                 if (selectedObj.properties.containsKey("Rotation")) {
                     val rotation = selectedObj.properties["Rotation"] as? Float ?: 0f
                     PropertyRow(label = "Rotation") {
@@ -447,7 +466,10 @@ fun PropertiesPanel(
                 }
             }
 
-            if (selectedObj.properties.containsKey("Transparency") && selectedObj.properties["Transparency"] is Float) {
+            if (selectedObj.className != RobloxClass.UIGradient &&
+                selectedObj.properties.containsKey("Transparency") &&
+                selectedObj.properties["Transparency"] is Float
+            ) {
                 val trans = selectedObj.properties["Transparency"] as? Float ?: 0f
                 PropertyRow(label = "Transparency") {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -490,6 +512,13 @@ fun PropertiesPanel(
                 }
 
                 val points = selectedObj.properties["ControlPoints"] as? String ?: "0.00,0.80;0.26,0.24;0.58,0.66;1.00,0.18"
+                Path2DControlPointEditor(
+                    pointsString = points,
+                    closed = closed,
+                    onPointsChange = { onUpdateProperty(selectedObj.id, "ControlPoints", it) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
                 PropertyRow(label = "Points") {
                     RobloxTextField(
                         value = points,
@@ -709,51 +738,24 @@ fun PropertiesPanel(
                     }
                 }
 
-                if (selectedObj.properties.containsKey("TopLeft")) {
-                    val radius = selectedObj.properties["TopLeft"] as? UDim2 ?: UDim2(0f, 8, 0f, 8)
-                    PropertyRow(label = "Top Left Corner") {
-                        StepperInput(
-                            value = radius.offsetX,
-                            onValueChange = { onUpdateProperty(selectedObj.id, "TopLeft", radius.copy(offsetX = it)) },
-                            min = 0,
-                            max = 100
-                        )
-                    }
-                }
-
-                if (selectedObj.properties.containsKey("TopRight")) {
-                    val radius = selectedObj.properties["TopRight"] as? UDim2 ?: UDim2(0f, 8, 0f, 8)
-                    PropertyRow(label = "Top Right Corner") {
-                        StepperInput(
-                            value = radius.offsetX,
-                            onValueChange = { onUpdateProperty(selectedObj.id, "TopRight", radius.copy(offsetX = it)) },
-                            min = 0,
-                            max = 100
-                        )
-                    }
-                }
-
-                if (selectedObj.properties.containsKey("BottomLeft")) {
-                    val radius = selectedObj.properties["BottomLeft"] as? UDim2 ?: UDim2(0f, 8, 0f, 8)
-                    PropertyRow(label = "Bottom Left Corner") {
-                        StepperInput(
-                            value = radius.offsetX,
-                            onValueChange = { onUpdateProperty(selectedObj.id, "BottomLeft", radius.copy(offsetX = it)) },
-                            min = 0,
-                            max = 100
-                        )
-                    }
-                }
-
-                if (selectedObj.properties.containsKey("BottomRight")) {
-                    val radius = selectedObj.properties["BottomRight"] as? UDim2 ?: UDim2(0f, 8, 0f, 8)
-                    PropertyRow(label = "Bottom Right Corner") {
-                        StepperInput(
-                            value = radius.offsetX,
-                            onValueChange = { onUpdateProperty(selectedObj.id, "BottomRight", radius.copy(offsetX = it)) },
-                            min = 0,
-                            max = 100
-                        )
+                listOf(
+                    Triple("TopLeftRadius", "TopLeft", "Top Left Corner"),
+                    Triple("TopRightRadius", "TopRight", "Top Right Corner"),
+                    Triple("BottomLeftRadius", "BottomLeft", "Bottom Left Corner"),
+                    Triple("BottomRightRadius", "BottomRight", "Bottom Right Corner")
+                ).forEach { (propName, legacyPropName, label) ->
+                    if (selectedObj.properties.containsKey(propName) || selectedObj.properties.containsKey(legacyPropName)) {
+                        val radius = selectedObj.properties[propName] as? UDim2
+                            ?: selectedObj.properties[legacyPropName] as? UDim2
+                            ?: UDim2(0f, 8, 0f, 8)
+                        PropertyRow(label = label) {
+                            StepperInput(
+                                value = radius.offsetX,
+                                onValueChange = { onUpdateProperty(selectedObj.id, propName, radius.copy(offsetX = it)) },
+                                min = 0,
+                                max = 100
+                            )
+                        }
                     }
                 }
 
@@ -863,6 +865,333 @@ fun PropertiesPanel(
             },
             lang = lang
         )
+    }
+
+    if (activeNumberSequenceProp != null) {
+        val (propName, rawValue) = activeNumberSequenceProp!!
+        NumberSequencePickerDialog(
+            initialSequence = rawValue,
+            title = "Gradient Transparency",
+            onDismiss = { activeNumberSequenceProp = null },
+            onSave = { newSequence ->
+                onUpdateProperty(selectedObj.id, propName, newSequence)
+                activeNumberSequenceProp = null
+            }
+        )
+    }
+}
+
+private fun parseNumberSequencePreviewStops(raw: Any?): List<Pair<Float, Float>> {
+    val stops = when (raw) {
+        is Number -> listOf(0f to raw.toFloat().coerceIn(0f, 1f), 1f to raw.toFloat().coerceIn(0f, 1f))
+        is String -> raw.split(";").mapNotNull { part ->
+            val segments = part.split(":")
+            if (segments.size < 2) return@mapNotNull null
+            val position = segments[0].trim().toFloatOrNull()?.coerceIn(0f, 1f) ?: return@mapNotNull null
+            val value = segments[1].trim().toFloatOrNull()?.coerceIn(0f, 1f) ?: return@mapNotNull null
+            position to value
+        }
+        else -> emptyList()
+    }.sortedBy { it.first }
+
+    if (stops.isEmpty()) return listOf(0f to 0f, 1f to 0f)
+    val normalized = stops.toMutableList()
+    if (normalized.first().first != 0f) normalized.add(0, 0f to normalized.first().second)
+    if (normalized.last().first != 1f) normalized.add(1f to normalized.last().second)
+    return normalized
+}
+
+@Composable
+private fun TransparencySequenceStrip(
+    stops: List<Pair<Float, Float>>,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    BoxWithConstraints(
+        modifier = modifier
+            .height(38.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(Color(0xFF10141B))
+            .border(1.dp, Color(0xFF3B4450), RoundedCornerShape(6.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 6.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val cell = 6.dp.toPx()
+            var y = 0f
+            var row = 0
+            while (y < size.height) {
+                var x = 0f
+                var col = 0
+                while (x < size.width) {
+                    val tint = if ((row + col) % 2 == 0) Color(0xFF2C3340) else Color(0xFF151A22)
+                    drawRect(tint, topLeft = Offset(x, y), size = androidx.compose.ui.geometry.Size(cell, cell))
+                    x += cell
+                    col += 1
+                }
+                y += cell
+                row += 1
+            }
+            drawRect(
+                brush = Brush.horizontalGradient(
+                    colorStops = stops.map { (position, value) ->
+                        position to Color(0xFF0A84FF).copy(alpha = (1f - value).coerceIn(0f, 1f))
+                    }.toTypedArray()
+                )
+            )
+        }
+
+        stops.forEach { (position, value) ->
+            Box(
+                modifier = Modifier
+                    .offset(x = (position * maxWidth.value).dp - 5.dp)
+                    .size(10.dp)
+                    .align(Alignment.BottomStart)
+                    .background(Color.White.copy(alpha = 0.9f), CircleShape)
+                    .border(1.dp, Color(0xFF0A84FF), CircleShape)
+            )
+        }
+
+        Text(
+            text = "Edit Key Sequence",
+            color = Color.White,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier
+                .background(Color.Black.copy(alpha = 0.36f), RoundedCornerShape(4.dp))
+                .padding(horizontal = 6.dp, vertical = 2.dp)
+        )
+    }
+}
+
+private fun parsePath2DPropertyPoints(raw: String): List<Vector2> {
+    return raw.split(";").mapNotNull { point ->
+        val parts = point.trim().split(",")
+        if (parts.size < 2) return@mapNotNull null
+        val x = parts[0].trim().toFloatOrNull()?.coerceIn(0f, 1f) ?: return@mapNotNull null
+        val y = parts[1].trim().toFloatOrNull()?.coerceIn(0f, 1f) ?: return@mapNotNull null
+        Vector2(x, y)
+    }.ifEmpty {
+        listOf(Vector2(0f, 0.8f), Vector2(0.32f, 0.28f), Vector2(0.68f, 0.64f), Vector2(1f, 0.18f))
+    }
+}
+
+private fun serializePath2DPropertyPoints(points: List<Vector2>): String {
+    return points.joinToString(";") { point ->
+        "${String.format("%.3f", point.x.coerceIn(0f, 1f))},${String.format("%.3f", point.y.coerceIn(0f, 1f))}"
+    }
+}
+
+private fun nearestPathPointIndex(points: List<Vector2>, offset: Offset, width: Float, height: Float): Int? {
+    val maxDistance = 28f
+    var bestIndex = -1
+    var bestDistanceSq = maxDistance * maxDistance
+    points.forEachIndexed { index, point ->
+        val dx = offset.x - point.x * width
+        val dy = offset.y - point.y * height
+        val distanceSq = dx * dx + dy * dy
+        if (distanceSq < bestDistanceSq) {
+            bestDistanceSq = distanceSq
+            bestIndex = index
+        }
+    }
+    return bestIndex.takeIf { it >= 0 }
+}
+
+@Composable
+private fun Path2DControlPointEditor(
+    pointsString: String,
+    closed: Boolean,
+    onPointsChange: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val points = remember(pointsString) { parsePath2DPropertyPoints(pointsString) }
+    var selectedIndex by remember(pointsString) { mutableStateOf(points.indices.firstOrNull() ?: 0) }
+    var draggingIndex by remember { mutableStateOf<Int?>(null) }
+    val safeSelectedIndex = selectedIndex.coerceIn(0, (points.size - 1).coerceAtLeast(0))
+
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Path2D Editor", color = Color(0xFFE7EAEE), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.weight(1f))
+            Text("${points.size} points", color = Color(0xFF8E96A3), fontSize = 9.sp)
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(172.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(Color(0xFF10151D))
+                .border(1.dp, Color(0xFF303743), RoundedCornerShape(6.dp))
+        ) {
+            Canvas(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(pointsString) {
+                        detectTapGestures { tap ->
+                            val nearest = nearestPathPointIndex(points, tap, size.width.toFloat(), size.height.toFloat())
+                            if (nearest != null) {
+                                selectedIndex = nearest
+                                return@detectTapGestures
+                            }
+                            val updated = (points + Vector2(
+                                (tap.x / size.width.toFloat()).coerceIn(0f, 1f),
+                                (tap.y / size.height.toFloat()).coerceIn(0f, 1f)
+                            )).take(50)
+                            selectedIndex = updated.lastIndex
+                            onPointsChange(serializePath2DPropertyPoints(updated))
+                        }
+                    }
+                    .pointerInput(pointsString) {
+                        detectDragGestures(
+                            onDragStart = { start ->
+                                draggingIndex = nearestPathPointIndex(points, start, size.width.toFloat(), size.height.toFloat())
+                                draggingIndex?.let { selectedIndex = it }
+                            },
+                            onDragEnd = { draggingIndex = null },
+                            onDragCancel = { draggingIndex = null },
+                            onDrag = { change, _ ->
+                                val index = draggingIndex ?: return@detectDragGestures
+                                change.consume()
+                                val updated = points.toMutableList()
+                                updated[index] = Vector2(
+                                    (change.position.x / size.width.toFloat()).coerceIn(0f, 1f),
+                                    (change.position.y / size.height.toFloat()).coerceIn(0f, 1f)
+                                )
+                                onPointsChange(serializePath2DPropertyPoints(updated))
+                            }
+                        )
+                    }
+            ) {
+                val minorColor = Color(76, 86, 104, 70)
+                val majorColor = Color(77, 153, 230, 105)
+                val step = 24.dp.toPx()
+                var x = 0f
+                var column = 0
+                while (x <= size.width) {
+                    drawLine(
+                        color = if (column % 4 == 0) majorColor else minorColor,
+                        start = Offset(x, 0f),
+                        end = Offset(x, size.height),
+                        strokeWidth = if (column % 4 == 0) 1.dp.toPx() else 0.5.dp.toPx()
+                    )
+                    x += step
+                    column += 1
+                }
+                var y = 0f
+                var row = 0
+                while (y <= size.height) {
+                    drawLine(
+                        color = if (row % 4 == 0) majorColor else minorColor,
+                        start = Offset(0f, y),
+                        end = Offset(size.width, y),
+                        strokeWidth = if (row % 4 == 0) 1.dp.toPx() else 0.5.dp.toPx()
+                    )
+                    y += step
+                    row += 1
+                }
+
+                if (points.size >= 2) {
+                    points.zipWithNext().forEach { (start, end) ->
+                        drawLine(
+                            color = Color(0xFF0A84FF),
+                            start = Offset(start.x * size.width, start.y * size.height),
+                            end = Offset(end.x * size.width, end.y * size.height),
+                            strokeWidth = 3.dp.toPx()
+                        )
+                    }
+                    if (closed) {
+                        drawLine(
+                            color = Color(0xFF0A84FF),
+                            start = Offset(points.last().x * size.width, points.last().y * size.height),
+                            end = Offset(points.first().x * size.width, points.first().y * size.height),
+                            strokeWidth = 3.dp.toPx()
+                        )
+                    }
+                }
+
+                points.forEachIndexed { index, point ->
+                    val center = Offset(point.x * size.width, point.y * size.height)
+                    val selected = index == safeSelectedIndex
+                    drawCircle(
+                        color = if (selected) Color.White else Color(0xFF111827),
+                        radius = if (selected) 8.dp.toPx() else 7.dp.toPx(),
+                        center = center
+                    )
+                    drawCircle(
+                        color = if (selected) Color(0xFF22C55E) else Color(0xFF0A84FF),
+                        radius = if (selected) 5.dp.toPx() else 4.dp.toPx(),
+                        center = center
+                    )
+                }
+            }
+
+            Text(
+                text = "Tap to add, drag points",
+                color = Color(0xFFC6CED8),
+                fontSize = 9.sp,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(8.dp)
+                    .background(Color.Black.copy(alpha = 0.34f), RoundedCornerShape(4.dp))
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            OutlinedButton(
+                onClick = {
+                    val insertAt = (safeSelectedIndex + 1).coerceIn(1, points.size)
+                    val selected = points.getOrNull(safeSelectedIndex) ?: Vector2(0.5f, 0.5f)
+                    val next = points.getOrNull(insertAt) ?: selected.copy(x = (selected.x + 0.12f).coerceIn(0f, 1f))
+                    val midpoint = Vector2((selected.x + next.x) / 2f, (selected.y + next.y) / 2f)
+                    val updated = points.toMutableList().apply { add(insertAt, midpoint) }.take(50)
+                    selectedIndex = insertAt
+                    onPointsChange(serializePath2DPropertyPoints(updated))
+                },
+                modifier = Modifier.weight(1f).height(34.dp),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+            ) {
+                Text("Add Key", fontSize = 9.sp)
+            }
+            OutlinedButton(
+                onClick = {
+                    if (points.size > 2) {
+                        val updated = points.toMutableList().apply { removeAt(safeSelectedIndex) }
+                        selectedIndex = (safeSelectedIndex - 1).coerceAtLeast(0)
+                        onPointsChange(serializePath2DPropertyPoints(updated))
+                    }
+                },
+                modifier = Modifier.weight(1f).height(34.dp),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+            ) {
+                Text("Remove", fontSize = 9.sp)
+            }
+            OutlinedButton(
+                onClick = {
+                    selectedIndex = 0
+                    onPointsChange("0.000,0.800;0.260,0.240;0.580,0.660;1.000,0.180")
+                },
+                modifier = Modifier.weight(1f).height(34.dp),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+            ) {
+                Text("Reset", fontSize = 9.sp)
+            }
+        }
+
+        points.getOrNull(safeSelectedIndex)?.let { selected ->
+            Text(
+                "Point ${safeSelectedIndex + 1}: ${(selected.x * 100).roundToInt()}%, ${(selected.y * 100).roundToInt()}%",
+                color = Color(0xFF8E96A3),
+                fontSize = 9.sp
+            )
+        }
     }
 }
 

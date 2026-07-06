@@ -14,6 +14,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import org.json.JSONObject
+import kotlin.math.abs
 import java.util.UUID
 
 class EditorViewModel(application: Application) : AndroidViewModel(application) {
@@ -383,10 +384,28 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
             saveHistoryState()
             lastTransformHistoryAt = now
         }
-        _rootObject.value = updateObjectInTree(_rootObject.value, id) { old ->
+        val rootSnapshot = _rootObject.value
+        val parent = findParentInTree(rootSnapshot, id)
+        val (parentW, parentH) = if (parent == null || parent.id == rootSnapshot.id) {
+            _screenWidth.value.toFloat() to _screenHeight.value.toFloat()
+        } else {
+            resolveAbsoluteObjectSize(rootSnapshot, parent)
+        }
+
+        _rootObject.value = updateObjectInTree(rootSnapshot, id) { old ->
             val updated = old.properties.toMutableMap()
-            updated["Position"] = position
+            val oldSize = old.properties["Size"] as? UDim2
+            val currentAnchor = old.properties["AnchorPoint"] as? Vector2 ?: Vector2(0f, 0f)
+            val movingWithoutResize = oldSize == size
+            val aligned = if (movingWithoutResize) {
+                resolveAutoAlignment(position, size, currentAnchor, parentW, parentH)
+            } else {
+                position to currentAnchor
+            }
+
+            updated["Position"] = aligned.first
             updated["Size"] = size
+            updated["AnchorPoint"] = aligned.second
             old.copy(properties = updated)
         }
         triggerAutosave()
@@ -611,6 +630,67 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     private fun containsObject(root: RobloxObject, targetId: String): Boolean {
         if (root.id == targetId) return true
         return root.children.any { containsObject(it, targetId) }
+    }
+
+    fun findParentOfObject(root: RobloxObject, childId: String): RobloxObject? {
+        return findParentInTree(root, childId)
+    }
+
+    private fun resolveAbsoluteObjectSize(root: RobloxObject, obj: RobloxObject): Pair<Float, Float> {
+        val parent = findParentInTree(root, obj.id)
+        val (parentW, parentH) = if (parent == null || parent.id == root.id) {
+            _screenWidth.value.toFloat() to _screenHeight.value.toFloat()
+        } else {
+            resolveAbsoluteObjectSize(root, parent)
+        }
+        val size = obj.properties["Size"] as? UDim2 ?: return parentW to parentH
+        return ((size.scaleX * parentW) + size.offsetX).coerceAtLeast(1f) to
+            ((size.scaleY * parentH) + size.offsetY).coerceAtLeast(1f)
+    }
+
+    private fun resolveAutoAlignment(
+        position: UDim2,
+        size: UDim2,
+        anchor: Vector2,
+        parentW: Float,
+        parentH: Float
+    ): Pair<UDim2, Vector2> {
+        val w = ((size.scaleX * parentW) + size.offsetX).coerceAtLeast(1f)
+        val h = ((size.scaleY * parentH) + size.offsetY).coerceAtLeast(1f)
+        val anchorX = (position.scaleX * parentW) + position.offsetX
+        val anchorY = (position.scaleY * parentH) + position.offsetY
+        val left = anchorX - anchor.x * w
+        val top = anchorY - anchor.y * h
+        val right = left + w
+        val bottom = top + h
+        val centerX = left + w / 2f
+        val centerY = top + h / 2f
+        val threshold = 8f
+
+        val horizontal = when {
+            abs(left) <= threshold -> Triple(0f, 0, 0f)
+            abs(centerX - parentW / 2f) <= threshold -> Triple(0.5f, 0, 0.5f)
+            abs(right - parentW) <= threshold -> Triple(1f, 0, 1f)
+            else -> null
+        }
+        val vertical = when {
+            abs(top) <= threshold -> Triple(0f, 0, 0f)
+            abs(centerY - parentH / 2f) <= threshold -> Triple(0.5f, 0, 0.5f)
+            abs(bottom - parentH) <= threshold -> Triple(1f, 0, 1f)
+            else -> null
+        }
+
+        val alignedPosition = position.copy(
+            scaleX = horizontal?.first ?: position.scaleX,
+            offsetX = horizontal?.second ?: position.offsetX,
+            scaleY = vertical?.first ?: position.scaleY,
+            offsetY = vertical?.second ?: position.offsetY
+        )
+        val alignedAnchor = anchor.copy(
+            x = horizontal?.third ?: anchor.x,
+            y = vertical?.third ?: anchor.y
+        )
+        return alignedPosition to alignedAnchor
     }
 
     private fun screenSizeForDevice(device: String): Pair<Int, Int> {

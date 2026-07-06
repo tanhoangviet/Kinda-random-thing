@@ -306,10 +306,10 @@ fun createDefaultObject(className: RobloxClass, customName: String? = null): Rob
         }
         RobloxClass.UICorner -> {
             properties["CornerRadius"] = UDim2(0f, 8, 0f, 8)
-            properties["TopLeft"] = UDim2(0f, 8, 0f, 8)
-            properties["TopRight"] = UDim2(0f, 8, 0f, 8)
-            properties["BottomLeft"] = UDim2(0f, 8, 0f, 8)
-            properties["BottomRight"] = UDim2(0f, 8, 0f, 8)
+            properties["TopLeftRadius"] = UDim2(0f, 8, 0f, 8)
+            properties["TopRightRadius"] = UDim2(0f, 8, 0f, 8)
+            properties["BottomLeftRadius"] = UDim2(0f, 8, 0f, 8)
+            properties["BottomRightRadius"] = UDim2(0f, 8, 0f, 8)
         }
         RobloxClass.UIShadow -> {
             properties["Color"] = Color3(0, 0, 0)
@@ -328,7 +328,7 @@ fun createDefaultObject(className: RobloxClass, customName: String? = null): Rob
         RobloxClass.UIGradient -> {
             properties["Color"] = "255,255,255 to 150,150,150"
             properties["Rotation"] = 90f
-            properties["Transparency"] = 0f
+            properties["Transparency"] = "0:0;1:0"
         }
         RobloxClass.UIScale -> {
             properties["Scale"] = 1f
@@ -339,7 +339,24 @@ fun createDefaultObject(className: RobloxClass, customName: String? = null): Rob
             properties["DominantAxis"] = "Width"
         }
         RobloxClass.LocalScript -> {
-            properties["Source"] = "-- LocalScript logic here\nprint('Hello from script!')"
+            properties["Source"] = """
+--!strict
+local TweenService = game:GetService("TweenService")
+
+local guiObject = script.Parent :: GuiObject
+local tweenInfo = TweenInfo.new(
+	0.35,
+	Enum.EasingStyle.Quad,
+	Enum.EasingDirection.Out
+)
+
+local hoverTween = TweenService:Create(guiObject, tweenInfo, {
+	Position = guiObject.Position + UDim2.fromOffset(0, -8),
+	BackgroundTransparency = 0.08,
+})
+
+hoverTween:Play()
+""".trimIndent()
         }
         RobloxClass.ModuleScript -> {
             properties["Source"] = "local Module = {}\n\nfunction Module.doSomething()\n\tprint('Doing something!')\nend\n\nreturn Module"
