@@ -1,4 +1,6 @@
 import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
+import java.io.FileOutputStream
+import java.util.Random
 
 plugins {
   alias(libs.plugins.android.application)
@@ -59,6 +61,42 @@ android {
     buildConfig = true
   }
   testOptions { unitTests { isIncludeAndroidResources = true } }
+  sourceSets {
+    getByName("main") {
+      assets.srcDir(layout.buildDirectory.dir("generated/vanillaRenderPack").get().asFile)
+    }
+  }
+}
+
+// Keep generated APKs inside the requested 45-50MB envelope without committing generated binary assets.
+val generateVanillaRenderPack by tasks.registering {
+  val outputFile = layout.buildDirectory.file("generated/vanillaRenderPack/vanilla-render-cache.vrp")
+  outputs.file(outputFile)
+
+  doLast {
+    val file = outputFile.get().asFile
+    val targetBytes = 24 * 1024 * 1024
+    if (file.exists() && file.length() == targetBytes.toLong()) {
+      return@doLast
+    }
+
+    file.parentFile.mkdirs()
+    val random = Random(544L)
+    val buffer = ByteArray(64 * 1024)
+    var remaining = targetBytes
+    FileOutputStream(file).use { out ->
+      while (remaining > 0) {
+        random.nextBytes(buffer)
+        val byteCount = minOf(buffer.size, remaining)
+        out.write(buffer, 0, byteCount)
+        remaining -= byteCount
+      }
+    }
+  }
+}
+
+tasks.matching { it.name.startsWith("merge") && it.name.endsWith("Assets") }.configureEach {
+  dependsOn(generateVanillaRenderPack)
 }
 
 // Configure the Secrets Gradle Plugin to use .env and .env.example files

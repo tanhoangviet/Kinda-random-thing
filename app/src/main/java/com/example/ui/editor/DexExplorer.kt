@@ -69,15 +69,17 @@ fun DexExplorerPanel(
 
     Column(
         modifier = modifier
-            .background(Color(0xFF25272C))
-            .border(1.dp, Color(0xFF3D4148))
-            .padding(6.dp)
+            .background(Color(0xFF1B2028))
+            .border(1.dp, Color(0xFF303743))
+            .padding(8.dp)
     ) {
         // Header
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(34.dp),
+                .height(38.dp)
+                .background(Color(0xFF222832), RoundedCornerShape(6.dp))
+                .padding(start = 8.dp, end = 2.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -90,7 +92,7 @@ fun DexExplorerPanel(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = "Explorer",
-                    color = Color(0xFFE7EAEE),
+                    color = Color(0xFFF4F7FB),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -148,14 +150,15 @@ fun DexExplorerPanel(
             singleLine = true,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(40.dp),
+                .height(38.dp),
+            shape = RoundedCornerShape(6.dp),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = Color(0, 162, 255),
-                unfocusedBorderColor = Color(0xFF3D4148),
+                focusedBorderColor = Color(0xFF0A84FF),
+                unfocusedBorderColor = Color(0xFF303743),
                 focusedTextColor = Color.White,
                 unfocusedTextColor = Color.White,
-                focusedContainerColor = Color(0xFF1C1E22),
-                unfocusedContainerColor = Color(0xFF1C1E22)
+                focusedContainerColor = Color(0xFF11151B),
+                unfocusedContainerColor = Color(0xFF11151B)
             ),
             textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp)
         )
@@ -234,34 +237,81 @@ fun DexExplorerPanel(
 
     // Rename Dialog
     if (renamingId != null) {
-        AlertDialog(
+        androidx.compose.ui.window.Dialog(
             onDismissRequest = { renamingId = null },
-            title = { Text("Rename Object", fontSize = 14.sp, fontWeight = FontWeight.Bold) },
-            text = {
-                OutlinedTextField(
-                    value = renameInput,
-                    onValueChange = { renameInput = it },
-                    singleLine = true,
-                    label = { Text("New Name") }
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        onRename(renamingId!!, renameInput)
-                        renamingId = null
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0, 162, 255))
-                ) {
-                    Text("Rename", color = Color.White)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { renamingId = null }) {
-                    Text("Cancel")
+            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth(0.38f)
+                    .widthIn(max = 360.dp),
+                color = Color(0xFF161A21),
+                shape = RoundedCornerShape(6.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF333A45))
+            ) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(42.dp)
+                            .background(Color(0xFF1E232B))
+                            .padding(horizontal = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Rename Object", color = Color(0xFFF4F7FB), fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    OutlinedTextField(
+                        value = renameInput,
+                        onValueChange = { renameInput = it },
+                        singleLine = true,
+                        label = { Text("New Name") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color(0xFF0A84FF),
+                            unfocusedBorderColor = Color(0xFF303743),
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedContainerColor = Color(0xFF0F1319),
+                            unfocusedContainerColor = Color(0xFF0F1319)
+                        )
+                    )
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(54.dp)
+                            .background(Color(0xFF11151B))
+                            .padding(horizontal = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedButton(
+                            onClick = { renamingId = null },
+                            shape = RoundedCornerShape(6.dp),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
+                            modifier = Modifier.height(36.dp)
+                        ) {
+                            Text("Cancel", fontSize = 12.sp)
+                        }
+                        Button(
+                            onClick = {
+                                onRename(renamingId!!, renameInput)
+                                renamingId = null
+                            },
+                            shape = RoundedCornerShape(6.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A84FF)),
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
+                            modifier = Modifier.height(36.dp)
+                        ) {
+                            Text("Rename", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
                 }
             }
-        )
+        }
     }
 }
 
@@ -317,15 +367,15 @@ fun RenderExplorerNode(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(34.dp)
+                    .height(32.dp)
                     .background(
                         color = when {
                             isDropTarget -> Color(0xFF22C55E).copy(alpha = 0.18f)
-                            isSelected -> Color(0xFF0A84FF).copy(alpha = 0.22f)
-                            draggingNodeId == node.id -> Color(0xFF8FBFF8).copy(alpha = 0.12f)
+                            isSelected -> Color(0xFF0A84FF).copy(alpha = 0.2f)
+                            draggingNodeId == node.id -> Color(0xFF8FBFF8).copy(alpha = 0.1f)
                             else -> Color.Transparent
                         },
-                        shape = RoundedCornerShape(3.dp)
+                        shape = RoundedCornerShape(5.dp)
                     )
                     .onGloballyPositioned { coordinates ->
                         rowCoordinates = coordinates
@@ -390,9 +440,9 @@ fun RenderExplorerNode(
                 // Object name
                 Text(
                     text = node.name,
-                    color = if (isSelected) Color.White else Color(220, 220, 220),
-                    fontSize = 12.sp,
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                    color = if (isSelected) Color.White else Color(0xFFD7DCE4),
+                    fontSize = 11.sp,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                     maxLines = 1,
                     modifier = Modifier.weight(1f)
                 )
@@ -418,8 +468,8 @@ fun RenderExplorerNode(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(start = (depth * 12 + 24).dp, end = 4.dp, top = 2.dp, bottom = 4.dp)
-                        .background(Color(0xFF1B1D22), RoundedCornerShape(4.dp))
-                        .border(1.dp, Color(0xFF3D4148), RoundedCornerShape(4.dp))
+                        .background(Color(0xFF11151B), RoundedCornerShape(6.dp))
+                        .border(1.dp, Color(0xFF303743), RoundedCornerShape(6.dp))
                         .padding(horizontal = 4.dp, vertical = 2.dp),
                     horizontalArrangement = Arrangement.spacedBy(2.dp),
                     verticalAlignment = Alignment.CenterVertically

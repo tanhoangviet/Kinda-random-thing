@@ -44,8 +44,8 @@ fun PropertiesPanel(
     if (selectedObj == null) {
         Box(
             modifier = modifier
-                .background(Color(0xFF25272C))
-                .border(1.dp, Color(0xFF3D4148))
+                .background(Color(0xFF1B2028))
+                .border(1.dp, Color(0xFF303743))
                 .padding(16.dp),
             contentAlignment = Alignment.Center
         ) {
@@ -79,8 +79,8 @@ fun PropertiesPanel(
 
     Column(
         modifier = modifier
-            .background(Color(0xFF202329))
-            .border(1.dp, Color(0xFF3D4148))
+            .background(Color(0xFF1B2028))
+            .border(1.dp, Color(0xFF303743))
             .verticalScroll(scrollState)
             .padding(8.dp)
     ) {
@@ -89,7 +89,7 @@ fun PropertiesPanel(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(40.dp)
-                .background(Color(0xFF252A31), RoundedCornerShape(4.dp))
+                .background(Color(0xFF222832), RoundedCornerShape(6.dp))
                 .padding(horizontal = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
@@ -823,13 +823,13 @@ fun PropertySection(title: String, content: @Composable ColumnScope.() -> Unit) 
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp)
-            .border(1.dp, Color(0xFF343942), RoundedCornerShape(4.dp))
+            .border(1.dp, Color(0xFF303743), RoundedCornerShape(6.dp))
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(32.dp)
-                .background(Color(0xFF2C3038), RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
+                .background(Color(0xFF232A34), RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
                 .clickable { expanded = !expanded }
                 .padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -852,7 +852,7 @@ fun PropertySection(title: String, content: @Composable ColumnScope.() -> Unit) 
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0xFF242830))
+                    .background(Color(0xFF1F2530))
                     .padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
@@ -1093,76 +1093,103 @@ fun ColorPickerDialog(
         Color3(30, 30, 30)    // Dark
     )
 
-    AlertDialog(
+    androidx.compose.ui.window.Dialog(
         onDismissRequest = onDismiss,
-        title = { Text("Color3 Select (RGB)", fontSize = 14.sp, fontWeight = FontWeight.Bold) },
-        text = {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // Color preview block
-                Box(
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.42f)
+                .widthIn(max = 420.dp)
+                .border(1.dp, Color(0xFF333A45), RoundedCornerShape(6.dp)),
+            color = Color(0xFF161A21),
+            shape = RoundedCornerShape(6.dp)
+        ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(50.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color(r, g, b))
-                        .border(1.dp, Color.Gray, RoundedCornerShape(8.dp)),
-                    contentAlignment = Alignment.Center
+                        .height(42.dp)
+                        .background(Color(0xFF1E232B))
+                        .padding(horizontal = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "RGB($r, $g, $b)",
-                        color = if ((r+g+b)/3 > 128) Color.Black else Color.White,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Text("Color3", color = Color(0xFFF4F7FB), fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.weight(1f))
+                    Text("RGB($r, $g, $b)", color = Color(0xFF8E96A3), fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
                 }
 
-                // Preset palette grid
-                Text("Presets:", fontSize = 11.sp, color = Color.Gray)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    presetColors.forEach { preset ->
-                        Box(
-                            modifier = Modifier
-                                .size(24.dp)
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(Color(preset.r, preset.g, preset.b))
-                                .border(1.dp, Color.White, RoundedCornerShape(4.dp))
-                                .clickable {
-                                    r = preset.r
-                                    g = preset.g
-                                    b = preset.b
-                                }
-                        )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(44.dp)
+                            .clip(RoundedCornerShape(5.dp))
+                            .background(Color(r, g, b))
+                            .border(1.dp, Color(0xFF303743), RoundedCornerShape(5.dp))
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        presetColors.forEach { preset ->
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .aspectRatio(1f)
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(Color(preset.r, preset.g, preset.b))
+                                    .border(1.dp, Color.White.copy(alpha = 0.35f), RoundedCornerShape(4.dp))
+                                    .clickable {
+                                        r = preset.r
+                                        g = preset.g
+                                        b = preset.b
+                                    }
+                            )
+                        }
+                    }
+
+                    ColorSlider(label = "Red", value = r, onValueChange = { r = it }, color = Color(0xFFFF5F57))
+                    ColorSlider(label = "Green", value = g, onValueChange = { g = it }, color = Color(0xFF28C840))
+                    ColorSlider(label = "Blue", value = b, onValueChange = { b = it }, color = Color(0xFF0A84FF))
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(54.dp)
+                        .background(Color(0xFF11151B))
+                        .padding(horizontal = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        shape = RoundedCornerShape(6.dp),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
+                        modifier = Modifier.height(36.dp)
+                    ) {
+                        Text("Cancel", fontSize = 12.sp)
+                    }
+                    Button(
+                        onClick = { onColorSelect(Color3(r, g, b)) },
+                        shape = RoundedCornerShape(6.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A84FF)),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
+                        modifier = Modifier.height(36.dp)
+                    ) {
+                        Text("Select", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                 }
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                // Custom RGB Sliders
-                ColorSlider(label = "Red (R)", value = r, onValueChange = { r = it }, color = Color.Red)
-                ColorSlider(label = "Green (G)", value = g, onValueChange = { g = it }, color = Color.Green)
-                ColorSlider(label = "Blue (B)", value = b, onValueChange = { b = it }, color = Color.Blue)
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = { onColorSelect(Color3(r, g, b)) },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0, 162, 255))
-            ) {
-                Text("Select", color = Color.White)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
             }
         }
-    )
+    }
 }
 
 @Composable

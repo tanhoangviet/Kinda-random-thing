@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -541,13 +542,18 @@ private fun StudioTopBar(
     onLoadProject: (ProjectEntity) -> Unit
 ) {
     Surface(
-        color = themeColors.topBar,
-        border = BorderStroke(0.5.dp, Color(0xFF343842))
+        color = Color(0xFF111419),
+        border = BorderStroke(0.5.dp, Color(0xFF252B34))
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(if (isCompact) 52.dp else 56.dp)
+                .height(if (isCompact) 48.dp else 52.dp)
+                .background(
+                    Brush.horizontalGradient(
+                        listOf(Color(0xFF111419), themeColors.topBar.copy(alpha = 0.82f), Color(0xFF111419))
+                    )
+                )
                 .padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -694,13 +700,14 @@ private fun StudioTopBar(
             FilledTonalButton(
                 onClick = onTogglePreview,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isPreviewMode) Color(0xFF1F7A4D) else Color(0xFF32353B),
+                    containerColor = if (isPreviewMode) Color(0xFF176B45) else Color(0xFF202631),
                     contentColor = Color.White
                 ),
+                shape = RoundedCornerShape(6.dp),
                 contentPadding = PaddingValues(horizontal = if (isCompact) 8.dp else 12.dp, vertical = 0.dp),
                 modifier = Modifier
                     .padding(start = 4.dp)
-                    .height(40.dp)
+                    .height(36.dp)
             ) {
                 Icon(
                     imageVector = if (isPreviewMode) Icons.Default.Visibility else Icons.Default.Edit,
@@ -1225,22 +1232,32 @@ fun ToolbarIconButton(
     text: String,
     onClick: () -> Unit
 ) {
-    IconButton(
+    Surface(
         onClick = onClick,
-        modifier = Modifier.size(48.dp)
+        color = Color(0x00111111),
+        contentColor = Color(0xFFE7EAEE),
+        shape = RoundedCornerShape(6.dp),
+        modifier = Modifier
+            .height(36.dp)
+            .widthIn(min = 58.dp)
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Row(
+            modifier = Modifier
+                .fillMaxHeight()
+                .padding(horizontal = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             if (iconRes != null) {
                 Image(
                     painter = painterResource(id = iconRes),
                     contentDescription = text,
-                    modifier = Modifier.size(22.dp)
+                    modifier = Modifier.size(18.dp)
                 )
             } else if (icon != null) {
-                Icon(imageVector = icon, contentDescription = text, tint = Color(0xFFE7EAEE), modifier = Modifier.size(22.dp))
+                Icon(imageVector = icon, contentDescription = text, tint = Color(0xFFE7EAEE), modifier = Modifier.size(18.dp))
             }
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(text, fontSize = 9.sp, color = Color(0xFFA6ACB3), fontWeight = FontWeight.SemiBold)
+            Text(text, fontSize = 10.sp, color = Color(0xFFC6CED8), fontWeight = FontWeight.SemiBold, maxLines = 1)
         }
     }
 }
@@ -1254,16 +1271,28 @@ fun ToolbarIconToggle(
     text: String,
     onCheckedChange: (Boolean) -> Unit
 ) {
-    IconButton(
+    Surface(
         onClick = { onCheckedChange(!checked) },
-        modifier = Modifier.size(48.dp)
+        color = if (checked) Color(0xFF0A84FF).copy(alpha = 0.14f) else Color(0x00111111),
+        contentColor = if (checked) Color(0xFF9AD7FF) else Color(0xFFC6CED8),
+        shape = RoundedCornerShape(6.dp),
+        border = if (checked) BorderStroke(1.dp, Color(0xFF0A84FF).copy(alpha = 0.35f)) else null,
+        modifier = Modifier
+            .height(36.dp)
+            .widthIn(min = 58.dp)
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Row(
+            modifier = Modifier
+                .fillMaxHeight()
+                .padding(horizontal = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             if (iconRes != null) {
                 Image(
                     painter = painterResource(id = iconRes),
                     contentDescription = text,
-                    modifier = Modifier.size(22.dp),
+                    modifier = Modifier.size(18.dp),
                     alpha = if (checked) 1f else 0.45f
                 )
             } else if (icon != null) {
@@ -1271,20 +1300,19 @@ fun ToolbarIconToggle(
                     imageVector = icon,
                     contentDescription = text,
                     tint = if (checked) Color(0xFF8FBFF8) else Color(0xFFA6ACB3),
-                    modifier = Modifier.size(22.dp)
+                    modifier = Modifier.size(18.dp)
                 )
             }
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(text, fontSize = 9.sp, color = if (checked) Color(0xFF8FBFF8) else Color(0xFFA6ACB3), fontWeight = FontWeight.SemiBold)
+            Text(text, fontSize = 10.sp, color = if (checked) Color(0xFF9AD7FF) else Color(0xFFC6CED8), fontWeight = FontWeight.SemiBold, maxLines = 1)
         }
     }
 }
 
 @Composable
 private fun StudioToolbarDivider() {
-    Spacer(modifier = Modifier.width(4.dp))
-    VerticalDivider(modifier = Modifier.height(32.dp), color = Color(0xFF3D4148))
-    Spacer(modifier = Modifier.width(4.dp))
+    Spacer(modifier = Modifier.width(3.dp))
+    VerticalDivider(modifier = Modifier.height(24.dp), color = Color(0xFF303743))
+    Spacer(modifier = Modifier.width(3.dp))
 }
 
 // Utility function to locate a parent's name

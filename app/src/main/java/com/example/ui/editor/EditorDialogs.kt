@@ -55,6 +55,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.example.data.model.Color3
 import kotlin.math.PI
 import kotlin.math.atan2
@@ -84,85 +85,97 @@ fun InsertObjectDialog(
         else -> emptyList()
     }
 
-    AlertDialog(
+    Dialog(
         onDismissRequest = onDismiss,
-        title = { Text("Insert Object", fontSize = 14.sp, fontWeight = FontWeight.Bold) },
-        text = {
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        StudioDialogSurface(
+            title = "Insert Object",
+            subtitle = "Choose an instance type for the selected parent",
+            onDismiss = onDismiss,
+            modifier = Modifier
+                .fillMaxWidth(0.66f)
+                .heightIn(min = 320.dp, max = 420.dp)
+                .widthIn(max = 680.dp),
+            footer = {
+                StudioGhostButton("Close", onDismiss)
+            }
+        ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(200.dp)
+                    .height(236.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                // Category list on the left
                 LazyColumn(
                     modifier = Modifier
-                        .weight(1f)
+                        .width(150.dp)
                         .fillMaxHeight()
-                        .border(1.dp, Color(45, 45, 50))
+                        .background(Color(0xFF11151B), RoundedCornerShape(6.dp))
+                        .border(1.dp, Color(0xFF2E3540), RoundedCornerShape(6.dp))
+                        .padding(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(3.dp)
                 ) {
                     items(categories) { cat ->
-                        Box(
+                        Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .background(if (selectedCategory == cat) Color(0, 162, 255, 40) else Color.Transparent)
+                                .height(34.dp)
+                                .background(if (selectedCategory == cat) Color(0xFF0A84FF).copy(alpha = 0.18f) else Color.Transparent, RoundedCornerShape(4.dp))
                                 .clickable { selectedCategory = cat }
-                                .padding(vertical = 8.dp, horizontal = 6.dp)
+                                .padding(horizontal = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
                                 text = cat,
-                                fontSize = 10.sp,
-                                color = if (selectedCategory == cat) Color.White else Color.Gray,
-                                fontWeight = if (selectedCategory == cat) FontWeight.Bold else FontWeight.Normal
+                                fontSize = 11.sp,
+                                color = if (selectedCategory == cat) Color(0xFFF4F7FB) else Color(0xFF8E96A3),
+                                fontWeight = if (selectedCategory == cat) FontWeight.SemiBold else FontWeight.Medium,
+                                maxLines = 1
                             )
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.width(8.dp))
-
-                // Object grid on the right
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(2),
                     modifier = Modifier
-                        .weight(2.2f)
+                        .weight(1f)
                         .fillMaxHeight(),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(objectsForCategory) { obj ->
-                        Card(
+                        Surface(
                             onClick = { onInsert(obj); onDismiss() },
-                            colors = CardDefaults.cardColors(containerColor = Color(35, 35, 40)),
-                            border = BorderStroke(0.5.dp, Color(55, 55, 60))
+                            color = Color(0xFF171C23),
+                            contentColor = Color.White,
+                            shape = RoundedCornerShape(6.dp),
+                            border = BorderStroke(1.dp, Color(0xFF2E3540))
                         ) {
-                            Column(
+                            Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(8.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center
+                                    .height(58.dp)
+                                    .padding(horizontal = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                RobloxClassIcon(className = obj, iconSize = 20.dp)
-                                Spacer(modifier = Modifier.height(6.dp))
+                                RobloxClassIcon(className = obj, iconSize = 22.dp)
                                 Text(
                                     text = obj.name,
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color(0xFFF4F7FB),
+                                    maxLines = 1
                                 )
                             }
                         }
                     }
                 }
             }
-        },
-        confirmButton = {},
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Close")
-            }
         }
-    )
+    }
 }
 
 // New Project Dialog
@@ -171,82 +184,297 @@ fun NewProjectDialog(
     onDismiss: () -> Unit,
     onCreate: (String, String) -> Unit // (name, template)
 ) {
-    var projectName by remember { mutableStateOf("My Adventure UI") }
+    var projectName by remember { mutableStateOf("New Interface") }
     var selectedTemplate by remember { mutableStateOf("Main Menu Dashboard") }
     
-    val templates = listOf("Empty Screen", "Main Menu Dashboard", "Item Shop Grid", "Player HUD Status")
+    val templates = listOf(
+        ProjectTemplateOption("Empty Screen", "Blank canvas with ScreenGui root", RobloxClass.ScreenGui),
+        ProjectTemplateOption("Main Menu Dashboard", "Hero frame, buttons, gradient polish", RobloxClass.Frame),
+        ProjectTemplateOption("Item Shop Grid", "Responsive shop layout and cards", RobloxClass.UIGridLayout),
+        ProjectTemplateOption("Player HUD Status", "Health, coins, status widgets", RobloxClass.TextLabel)
+    )
+    val selectedTemplateOption = templates.firstOrNull { it.name == selectedTemplate } ?: templates.first()
 
-    AlertDialog(
+    Dialog(
         onDismissRequest = onDismiss,
-        title = { Text("New Roblox UI Project", fontSize = 14.sp, fontWeight = FontWeight.Bold) },
-        text = {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                OutlinedTextField(
-                    value = projectName,
-                    onValueChange = { projectName = it },
-                    label = { Text("Project Name", fontSize = 11.sp) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        StudioDialogSurface(
+            title = "New UI Project",
+            subtitle = "Create a local autosaved Roblox GUI workspace",
+            onDismiss = onDismiss,
+            modifier = Modifier
+                .fillMaxWidth(0.68f)
+                .heightIn(min = 392.dp, max = 500.dp)
+                .widthIn(max = 760.dp),
+            footer = {
+                StudioGhostButton("Cancel", onDismiss)
+                StudioPrimaryButton(
+                    label = "Create",
+                    enabled = projectName.isNotBlank(),
+                    onClick = {
+                        onCreate(projectName.ifBlank { "New Project" }, selectedTemplate)
+                        onDismiss()
+                    }
                 )
-
-                Text("Starting Template:", fontSize = 11.sp, color = Color.Gray)
-                
-                LazyColumn(
+            }
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(130.dp)
-                        .border(1.dp, Color(45, 45, 50))
+                        .weight(1.15f),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    items(templates) { temp ->
+                    StudioFieldLabel("Project name")
+                    CompactStudioTextField(
+                        value = projectName,
+                        onValueChange = { projectName = it },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text("Template", fontSize = 11.sp, color = Color(0xFF8E96A3), fontWeight = FontWeight.SemiBold)
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        templates.forEach { template ->
+                            TemplateChoiceRow(
+                                template = template,
+                                selected = selectedTemplate == template.name,
+                                onClick = { selectedTemplate = template.name }
+                            )
+                        }
+                    }
+                }
+
+                Column(
+                    modifier = Modifier
+                        .weight(0.85f)
+                        .heightIn(min = 286.dp)
+                        .background(Color(0xFF11151B), RoundedCornerShape(8.dp))
+                        .border(1.dp, Color(0xFF2E3540), RoundedCornerShape(8.dp))
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text("Preview", color = Color(0xFFF4F7FB), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(132.dp)
+                            .background(Color(0xFF090D12), RoundedCornerShape(6.dp))
+                            .border(1.dp, Color(0xFF303844), RoundedCornerShape(6.dp))
+                            .padding(10.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .fillMaxWidth(0.78f)
+                                .fillMaxHeight(0.56f)
+                                .background(Brush.linearGradient(listOf(Color(0xFF0A84FF).copy(alpha = 0.34f), Color(0xFF27D17F).copy(alpha = 0.22f))), RoundedCornerShape(4.dp))
+                                .border(1.dp, Color(0xFF54B6FF).copy(alpha = 0.4f), RoundedCornerShape(4.dp))
+                        )
                         Row(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .background(if (selectedTemplate == temp) Color(0, 162, 255, 30) else Color.Transparent)
-                                .clickable { selectedTemplate = temp }
-                                .padding(10.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                                .align(Alignment.BottomStart)
+                                .fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(5.dp)
                         ) {
-                            RadioButton(
-                                selected = (selectedTemplate == temp),
-                                onClick = { selectedTemplate = temp },
-                                colors = RadioButtonDefaults.colors(selectedColor = Color(0, 162, 255))
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Column {
-                                Text(temp, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                                Text(
-                                    text = when (temp) {
-                                        "Empty Screen" -> "Start fresh with a blank canvas Frame."
-                                        "Main Menu Dashboard" -> "Prebuilt beautiful stylized start menu."
-                                        "Item Shop Grid" -> "Grid layout with scrolling item buy buttons."
-                                        else -> "Top-left player status frame with dynamic HP bar."
-                                    },
-                                    fontSize = 8.sp,
-                                    color = Color.Gray
+                            repeat(4) { index ->
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(if (index == 1) 18.dp else 12.dp)
+                                        .align(Alignment.Bottom)
+                                        .background(if (index == 1) Color(0xFF0A84FF) else Color(0xFF252C36), RoundedCornerShape(3.dp))
                                 )
                             }
                         }
                     }
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        RobloxClassIcon(className = selectedTemplateOption.iconClass, iconSize = 22.dp)
+                        Column {
+                            Text(selectedTemplateOption.name, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                            Text(selectedTemplateOption.description, color = Color(0xFF8E96A3), fontSize = 9.sp, maxLines = 2)
+                        }
+                    }
+                    HorizontalDivider(color = Color(0xFF2E3540))
+                    Text("Autosave local storage is enabled. DPI starts at 40% for mobile landscape.", color = Color(0xFF8E96A3), fontSize = 9.sp, lineHeight = 12.sp)
                 }
             }
-        },
-        confirmButton = {
-            Button(
-                onClick = { onCreate(projectName, selectedTemplate); onDismiss() },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0, 162, 255))
+        }
+    }
+}
+
+private data class ProjectTemplateOption(
+    val name: String,
+    val description: String,
+    val iconClass: RobloxClass
+)
+
+@Composable
+private fun StudioDialogSurface(
+    title: String,
+    subtitle: String,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+    footer: @Composable RowScope.() -> Unit,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Surface(
+        modifier = modifier,
+        color = Color(0xFF161A21),
+        contentColor = Color.White,
+        shape = RoundedCornerShape(8.dp),
+        border = BorderStroke(1.dp, Color(0xFF333A45))
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp)
+                    .background(Color(0xFF1E232B))
+                    .padding(horizontal = 14.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Create Project", color = Color.White)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(title, color = Color(0xFFF4F7FB), fontSize = 16.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                    Text(subtitle, color = Color(0xFF8E96A3), fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                IconButton(onClick = onDismiss, modifier = Modifier.size(40.dp)) {
+                    Icon(Icons.Default.Close, contentDescription = "Close", tint = Color(0xFFA8B0BC), modifier = Modifier.size(18.dp))
+                }
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f, fill = false)
+                    .padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                content = content
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(58.dp)
+                    .background(Color(0xFF11151B))
+                    .border(0.5.dp, Color(0xFF2E3540))
+                    .padding(horizontal = 14.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                verticalAlignment = Alignment.CenterVertically,
+                content = footer
+            )
+        }
+    }
+}
+
+@Composable
+private fun StudioFieldLabel(text: String) {
+    Text(text, color = Color(0xFF8E96A3), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+}
+
+@Composable
+private fun CompactStudioTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    BasicTextField(
+        value = value,
+        onValueChange = onValueChange,
+        singleLine = true,
+        textStyle = androidx.compose.ui.text.TextStyle(
+            color = Color(0xFFF4F7FB),
+            fontSize = 15.sp,
+            fontWeight = FontWeight.SemiBold
+        ),
+        cursorBrush = SolidColor(Color(0xFF0A84FF)),
+        modifier = modifier.height(44.dp),
+        decorationBox = { innerTextField ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0xFF0F1319), RoundedCornerShape(6.dp))
+                    .border(1.dp, Color(0xFF333A45), RoundedCornerShape(6.dp))
+                    .padding(horizontal = 12.dp),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                innerTextField()
             }
         }
     )
+}
+
+@Composable
+private fun TemplateChoiceRow(
+    template: ProjectTemplateOption,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(50.dp)
+            .background(if (selected) Color(0xFF0A84FF).copy(alpha = 0.16f) else Color(0xFF11151B), RoundedCornerShape(6.dp))
+            .border(1.dp, if (selected) Color(0xFF0A84FF).copy(alpha = 0.65f) else Color(0xFF2E3540), RoundedCornerShape(6.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(18.dp)
+                .background(if (selected) Color(0xFF0A84FF) else Color.Transparent, CircleShape)
+                .border(1.5.dp, if (selected) Color(0xFF69C3FF) else Color(0xFF68727F), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            if (selected) {
+                Box(modifier = Modifier.size(6.dp).background(Color.White, CircleShape))
+            }
+        }
+        RobloxClassIcon(className = template.iconClass, iconSize = 20.dp)
+        Column(modifier = Modifier.weight(1f)) {
+            Text(template.name, color = Color(0xFFF4F7FB), fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+            Text(template.description, color = Color(0xFF8E96A3), fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+@Composable
+private fun StudioGhostButton(label: String, onClick: () -> Unit) {
+    OutlinedButton(
+        onClick = onClick,
+        shape = RoundedCornerShape(6.dp),
+        border = BorderStroke(1.dp, Color(0xFF3A4350)),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFC6CED8)),
+        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
+        modifier = Modifier.height(38.dp)
+    ) {
+        Text(label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+private fun StudioPrimaryButton(
+    label: String,
+    enabled: Boolean = true,
+    onClick: () -> Unit
+) {
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        shape = RoundedCornerShape(6.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = Color(0xFF0A84FF),
+            contentColor = Color.White,
+            disabledContainerColor = Color(0xFF26313E),
+            disabledContentColor = Color(0xFF7D8794)
+        ),
+        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 0.dp),
+        modifier = Modifier.height(38.dp)
+    ) {
+        Text(label, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+    }
 }
 
 // Open Saved Project Dialog
@@ -257,40 +485,59 @@ fun OpenProjectDialog(
     onLoadProject: (ProjectEntity) -> Unit,
     onDeleteProject: (String) -> Unit
 ) {
-    AlertDialog(
+    Dialog(
         onDismissRequest = onDismiss,
-        title = { Text("Open Roblox GUI Project", fontSize = 14.sp, fontWeight = FontWeight.Bold) },
-        text = {
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        StudioDialogSurface(
+            title = "Project Manager",
+            subtitle = "${projects.size} local project${if (projects.size == 1) "" else "s"} saved on this device",
+            onDismiss = onDismiss,
+            modifier = Modifier
+                .fillMaxWidth(0.64f)
+                .heightIn(min = 340.dp, max = 520.dp)
+                .widthIn(max = 720.dp),
+            footer = {
+                StudioGhostButton("Close", onDismiss)
+            }
+        ) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(220.dp)
+                    .heightIn(min = 230.dp, max = 360.dp)
             ) {
                 if (projects.isEmpty()) {
                     Box(
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color(0xFF11151B), RoundedCornerShape(8.dp))
+                            .border(1.dp, Color(0xFF2E3540), RoundedCornerShape(8.dp)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("No saved projects found.", color = Color.Gray, fontSize = 11.sp)
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.Default.FolderOpen, contentDescription = null, tint = Color(0xFF5C6673), modifier = Modifier.size(34.dp))
+                            Text("No saved projects", color = Color(0xFFC6CED8), fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            Text("Create a project and it will autosave here.", color = Color(0xFF8E96A3), fontSize = 10.sp)
+                        }
                     }
                 } else {
                     LazyColumn(
                         modifier = Modifier
                             .fillMaxSize()
-                            .border(1.dp, Color(45, 45, 50))
+                            .background(Color(0xFF11151B), RoundedCornerShape(8.dp))
+                            .border(1.dp, Color(0xFF2E3540), RoundedCornerShape(8.dp))
+                            .padding(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         items(projects) { project ->
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .height(58.dp)
+                                    .background(Color(0xFF171C23), RoundedCornerShape(6.dp))
+                                    .border(1.dp, Color(0xFF2E3540), RoundedCornerShape(6.dp))
                                     .clickable { onLoadProject(project); onDismiss() }
-                                    .padding(8.dp)
-                                    .border(
-                                        width = 0.5.dp,
-                                        color = Color(50, 50, 55),
-                                        shape = RoundedCornerShape(4.dp)
-                                    )
-                                    .padding(8.dp),
+                                    .padding(horizontal = 10.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
@@ -298,21 +545,21 @@ fun OpenProjectDialog(
                                     verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier.weight(1f)
                                 ) {
-                                    Icon(Icons.Default.FolderOpen, contentDescription = null, tint = Color(241, 196, 15))
+                                    Icon(Icons.Default.FolderOpen, contentDescription = null, tint = Color(0xFF0A84FF), modifier = Modifier.size(22.dp))
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Column {
-                                        Text(project.name, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                                        Text(project.description, fontSize = 8.sp, color = Color.Gray)
+                                        Text(project.name, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFFF4F7FB), maxLines = 1)
+                                        Text(project.description, fontSize = 9.sp, color = Color(0xFF8E96A3), maxLines = 1)
                                     }
                                 }
                                 IconButton(
                                     onClick = { onDeleteProject(project.id) },
-                                    modifier = Modifier.size(24.dp)
+                                    modifier = Modifier.size(40.dp)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Delete,
                                         contentDescription = "Delete",
-                                        tint = Color.Red,
+                                        tint = Color(0xFFFF5F57),
                                         modifier = Modifier.size(16.dp)
                                     )
                                 }
@@ -321,14 +568,8 @@ fun OpenProjectDialog(
                     }
                 }
             }
-        },
-        confirmButton = {},
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
         }
-    )
+    }
 }
 
 // Export Luau Script Dialog
@@ -552,54 +793,78 @@ fun ScriptEditorDialog(
 ) {
     var source by remember { mutableStateOf(obj.properties["Source"] as? String ?: "") }
 
-    AlertDialog(
+    Dialog(
         onDismissRequest = onDismiss,
-        title = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                RobloxClassIcon(className = obj.className, iconSize = 20.dp)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(text = "Editing: ${obj.name}", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        StudioDialogSurface(
+            title = "Script Editor",
+            subtitle = "${obj.className.name}  |  ${obj.name}",
+            onDismiss = onDismiss,
+            modifier = Modifier
+                .fillMaxWidth(0.72f)
+                .heightIn(min = 430.dp, max = 560.dp)
+                .widthIn(max = 840.dp),
+            footer = {
+                StudioGhostButton("Cancel", onDismiss)
+                StudioPrimaryButton(
+                    label = "Save Script",
+                    onClick = {
+                        onSave(source)
+                        onDismiss()
+                    }
+                )
             }
-        },
-        text = {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Text("Script Source:", fontSize = 11.sp, color = Color.Gray)
-                Spacer(modifier = Modifier.height(4.dp))
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(320.dp)
+                    .background(Color(0xFF0F1319), RoundedCornerShape(6.dp))
+                    .border(1.dp, Color(0xFF303743), RoundedCornerShape(6.dp))
+                    .padding(10.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    RobloxClassIcon(className = obj.className, iconSize = 20.dp)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = obj.className.name,
+                        color = Color(0xFFF4F7FB),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.weight(1f))
+                    Text(
+                        text = "${source.lines().size} lines",
+                        color = Color(0xFF8E96A3),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
                 OutlinedTextField(
                     value = source,
                     onValueChange = { source = it },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(300.dp),
+                    modifier = Modifier.fillMaxSize(),
                     textStyle = MaterialTheme.typography.bodySmall.copy(
                         fontFamily = FontFamily.Monospace,
-                        fontSize = 11.sp
+                        fontSize = 11.sp,
+                        lineHeight = 15.sp
                     ),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color(0, 162, 255),
-                        unfocusedBorderColor = Color(60, 60, 65),
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        focusedContainerColor = Color(15, 15, 18),
-                        unfocusedContainerColor = Color(15, 15, 18)
-                    )
+                        focusedBorderColor = Color(0xFF0A84FF),
+                        unfocusedBorderColor = Color(0xFF2E3540),
+                        focusedTextColor = Color(0xFFE7EAEE),
+                        unfocusedTextColor = Color(0xFFE7EAEE),
+                        cursorColor = Color(0xFF0A84FF),
+                        focusedContainerColor = Color(0xFF090D12),
+                        unfocusedContainerColor = Color(0xFF090D12)
+                    ),
+                    shape = RoundedCornerShape(5.dp)
                 )
             }
-        },
-        confirmButton = {
-            Button(
-                onClick = { onSave(source); onDismiss() },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0, 162, 255))
-            ) {
-                Text("Save Script", color = Color.White)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
         }
-    )
+    }
 }
 
 @Composable
@@ -642,18 +907,18 @@ fun GradientPickerDialog(
     var offsetX by remember { mutableStateOf(0f) }
     var offsetY by remember { mutableStateOf(0f) }
 
-    androidx.compose.ui.window.Dialog(
+    Dialog(
         onDismissRequest = onDismiss,
-        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+        properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Card(
-            shape = RoundedCornerShape(8.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(26, 28, 32)),
-            border = BorderStroke(1.dp, Color(60, 60, 65)),
+            shape = RoundedCornerShape(6.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF161A21)),
+            border = BorderStroke(1.dp, Color(0xFF333A45)),
             modifier = Modifier
-                .fillMaxWidth(0.74f)
-                .widthIn(max = 560.dp)
-                .heightIn(max = 620.dp)
+                .fillMaxWidth(0.58f)
+                .widthIn(max = 520.dp)
+                .heightIn(max = 580.dp)
                 .padding(8.dp)
                 .offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) }
         ) {
@@ -663,7 +928,8 @@ fun GradientPickerDialog(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color(32, 32, 38))
+                        .height(42.dp)
+                        .background(Color(0xFF1E232B))
                         .pointerInput(Unit) {
                             detectDragGestures { change, dragAmount ->
                                 change.consume()
@@ -671,7 +937,7 @@ fun GradientPickerDialog(
                                 offsetY += dragAmount.y
                             }
                         }
-                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                        .padding(horizontal = 12.dp)
                 ) {
                     Box(
                         modifier = Modifier
@@ -684,16 +950,16 @@ fun GradientPickerDialog(
                     Spacer(Modifier.width(8.dp))
                     Text(
                         text = Locales.translate("adv_gradient_title", lang),
-                        fontSize = 13.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = Color(0xFFF4F7FB)
                     )
                     Spacer(Modifier.weight(1f))
                     IconButton(
                         onClick = onDismiss,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(36.dp)
                     ) {
-                        Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.LightGray, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Default.Close, contentDescription = "Close", tint = Color(0xFFA8B0BC), modifier = Modifier.size(16.dp))
                     }
                 }
 
@@ -701,19 +967,19 @@ fun GradientPickerDialog(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(10.dp)
+                        .padding(8.dp)
                         .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(7.dp)
                 ) {
                     // Main Gradient Showcase Card
                     Card(
                         shape = RoundedCornerShape(6.dp),
-                        border = BorderStroke(1.dp, Color(60, 60, 65)),
-                        colors = CardDefaults.cardColors(containerColor = Color(28, 28, 32)),
+                        border = BorderStroke(1.dp, Color(0xFF2E3540)),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF11151B)),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text(Locales.translate("gradient_preview", lang), fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = Color.Gray)
+                            Text(Locales.translate("gradient_preview", lang), fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF8E96A3))
                             
                             // Main Gradient Strip
                             Box(
@@ -726,7 +992,7 @@ fun GradientPickerDialog(
                                             colorStops = stops.map { it.position to it.color }.toTypedArray()
                                         )
                                     )
-                                    .border(1.dp, Color(50, 50, 55), RoundedCornerShape(4.dp))
+                                    .border(1.dp, Color(0xFF303743), RoundedCornerShape(4.dp))
                             )
                         }
                     }
@@ -750,7 +1016,7 @@ fun GradientPickerDialog(
                                     .size(width = 54.dp, height = 24.dp)
                                     .clip(RoundedCornerShape(4.dp))
                                     .background(Brush.horizontalGradient(colorStops = preset.map { it.position to it.color }.toTypedArray()))
-                                    .border(1.dp, Color(65, 70, 78), RoundedCornerShape(4.dp))
+                                    .border(1.dp, Color(0xFF303743), RoundedCornerShape(4.dp))
                                     .clickable {
                                         stops = preset
                                         selectedStopIndex = 0
@@ -762,8 +1028,8 @@ fun GradientPickerDialog(
                     // Interactive Stops Control Strip (DPI-Responsive & Drag-Optimized)
                     Card(
                         shape = RoundedCornerShape(6.dp),
-                        border = BorderStroke(1.dp, Color(60, 60, 65)),
-                        colors = CardDefaults.cardColors(containerColor = Color(20, 20, 24)),
+                        border = BorderStroke(1.dp, Color(0xFF2E3540)),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF11151B)),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(
@@ -771,9 +1037,9 @@ fun GradientPickerDialog(
                             verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(Locales.translate("gradient_track", lang), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Color.Gray)
+                                Text(Locales.translate("gradient_track", lang), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF8E96A3))
                                 Spacer(Modifier.weight(1f))
-                                Text(Locales.translate("click_to_add", lang), fontSize = 10.sp, color = Color(0, 162, 255))
+                                Text(Locales.translate("click_to_add", lang), fontSize = 10.sp, color = Color(0xFF0A84FF))
                             }
                             
                             // Interactive slider track
@@ -809,7 +1075,7 @@ fun GradientPickerDialog(
                                         .height(6.dp)
                                         .align(Alignment.Center)
                                         .clip(RoundedCornerShape(3.dp))
-                                        .background(Color(45, 45, 50))
+                                        .background(Color(0xFF303743))
                                 )
 
                                 // Render stops markers
@@ -849,12 +1115,12 @@ fun GradientPickerDialog(
                                             modifier = Modifier
                                                 .size(20.dp)
                                                 .background(
-                                                    if (isSelected) Color(0, 162, 255) else Color(40, 40, 45),
+                                                    if (isSelected) Color(0xFF0A84FF) else Color(0xFF202631),
                                                     CircleShape
                                                 )
                                                 .border(
                                                     if (isSelected) 2.dp else 1.dp,
-                                                    if (isSelected) Color.White else Color.Gray,
+                                                    if (isSelected) Color.White else Color(0xFF8E96A3),
                                                     CircleShape
                                                 )
                                         )
@@ -885,8 +1151,8 @@ fun GradientPickerDialog(
                                     Row(
                                         modifier = Modifier
                                             .clip(RoundedCornerShape(4.dp))
-                                            .background(if (isSelected) Color(0, 162, 255).copy(alpha = 0.2f) else Color(30, 30, 35))
-                                            .border(1.dp, if (isSelected) Color(0, 162, 255) else Color(50, 50, 55), RoundedCornerShape(4.dp))
+                                            .background(if (isSelected) Color(0xFF0A84FF).copy(alpha = 0.2f) else Color(0xFF202631))
+                                            .border(1.dp, if (isSelected) Color(0xFF0A84FF) else Color(0xFF303743), RoundedCornerShape(4.dp))
                                             .clickable { selectedStopIndex = index }
                                             .padding(horizontal = 8.dp, vertical = 4.dp),
                                         verticalAlignment = Alignment.CenterVertically,
@@ -900,7 +1166,7 @@ fun GradientPickerDialog(
                                         )
                                         Text(
                                             text = "${Locales.translate("point", lang)} ${index + 1} (${(stop.position * 100).roundToInt()}%)",
-                                            color = if (isSelected) Color.White else Color.LightGray,
+                                            color = if (isSelected) Color.White else Color(0xFFC6CED8),
                                             fontSize = 10.sp,
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                                         )
@@ -922,8 +1188,8 @@ fun GradientPickerDialog(
 
                         Card(
                             shape = RoundedCornerShape(6.dp),
-                            border = BorderStroke(1.dp, Color(65, 65, 70)),
-                            colors = CardDefaults.cardColors(containerColor = Color(28, 28, 32)),
+                            border = BorderStroke(1.dp, Color(0xFF2E3540)),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF11151B)),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Column(
@@ -965,9 +1231,9 @@ fun GradientPickerDialog(
                                         verticalAlignment = Alignment.CenterVertically,
                                         modifier = Modifier.fillMaxWidth()
                                     ) {
-                                        Text(Locales.translate("stop_position", lang), fontSize = 11.sp, color = Color.Gray)
+                                        Text(Locales.translate("stop_position", lang), fontSize = 11.sp, color = Color(0xFF8E96A3))
                                         Spacer(Modifier.weight(1f))
-                                        Text("${(currentStop.position * 100).roundToInt()}%", fontSize = 11.sp, color = Color(0, 162, 255), fontWeight = FontWeight.Bold)
+                                        Text("${(currentStop.position * 100).roundToInt()}%", fontSize = 11.sp, color = Color(0xFF0A84FF), fontWeight = FontWeight.Bold)
                                     }
                                     Slider(
                                         value = currentStop.position,
@@ -980,17 +1246,17 @@ fun GradientPickerDialog(
                                             }.coerceIn(0, stops.size - 1)
                                         },
                                         colors = SliderDefaults.colors(
-                                            activeTrackColor = Color(0, 162, 255),
-                                            inactiveTrackColor = Color(55, 55, 60),
+                                            activeTrackColor = Color(0xFF0A84FF),
+                                            inactiveTrackColor = Color(0xFF303743),
                                             thumbColor = Color.White
                                         )
                                     )
                                 }
 
-                                Divider(color = Color(50, 50, 55), thickness = 1.dp)
+                                HorizontalDivider(color = Color(0xFF2E3540), thickness = 1.dp)
 
                                 // VISUAL COLOR PICKER: circular hue/saturation wheel + value sliders.
-                                Text(Locales.translate("visual_color_mixer", lang), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
+                                Text(Locales.translate("visual_color_mixer", lang), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF8E96A3))
 
                                 CircularColorWheel(
                                     hue = hue,
@@ -1004,15 +1270,15 @@ fun GradientPickerDialog(
                                     },
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(128.dp)
+                                        .height(112.dp)
                                 )
 
                                 // 1. Hue Spectrum Slider
                                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                     Row {
-                                        Text(Locales.translate("hue", lang), fontSize = 10.sp, color = Color.LightGray)
+                                        Text(Locales.translate("hue", lang), fontSize = 10.sp, color = Color(0xFFC6CED8))
                                         Spacer(Modifier.weight(1f))
-                                        Text("${hue.roundToInt()}°", fontSize = 10.sp, color = Color.Gray)
+                                        Text("${hue.roundToInt()}°", fontSize = 10.sp, color = Color(0xFF8E96A3))
                                     }
                                     val hueColors = listOf(
                                         Color.Red, Color.Yellow, Color.Green, Color.Cyan, Color.Blue, Color.Magenta, Color.Red
@@ -1032,9 +1298,9 @@ fun GradientPickerDialog(
                                 // 2. Saturation Slider (Gradually saturates the color)
                                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                     Row {
-                                        Text(Locales.translate("saturation", lang), fontSize = 10.sp, color = Color.LightGray)
+                                        Text(Locales.translate("saturation", lang), fontSize = 10.sp, color = Color(0xFFC6CED8))
                                         Spacer(Modifier.weight(1f))
-                                        Text("${(saturation * 100).roundToInt()}%", fontSize = 10.sp, color = Color.Gray)
+                                        Text("${(saturation * 100).roundToInt()}%", fontSize = 10.sp, color = Color(0xFF8E96A3))
                                     }
                                     val satStart = hsvToColor(hue, 0f, value)
                                     val satEnd = hsvToColor(hue, 1f, value)
@@ -1053,9 +1319,9 @@ fun GradientPickerDialog(
                                 // 3. Brightness / Value Slider
                                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                     Row {
-                                        Text(Locales.translate("brightness", lang), fontSize = 10.sp, color = Color.LightGray)
+                                        Text(Locales.translate("brightness", lang), fontSize = 10.sp, color = Color(0xFFC6CED8))
                                         Spacer(Modifier.weight(1f))
-                                        Text("${(value * 100).roundToInt()}%", fontSize = 10.sp, color = Color.Gray)
+                                        Text("${(value * 100).roundToInt()}%", fontSize = 10.sp, color = Color(0xFF8E96A3))
                                     }
                                     val valStart = hsvToColor(hue, saturation, 0f)
                                     val valEnd = hsvToColor(hue, saturation, 1f)
@@ -1106,8 +1372,8 @@ fun GradientPickerDialog(
                                                 Box(
                                                     modifier = Modifier
                                                         .fillMaxSize()
-                                                        .background(Color(20, 20, 24), RoundedCornerShape(4.dp))
-                                                        .border(1.dp, Color(70, 70, 75), RoundedCornerShape(4.dp)),
+                                                        .background(Color(0xFF0F1319), RoundedCornerShape(4.dp))
+                                                        .border(1.dp, Color(0xFF303743), RoundedCornerShape(4.dp)),
                                                     contentAlignment = Alignment.Center
                                                 ) {
                                                     innerTextField()
@@ -1115,7 +1381,7 @@ fun GradientPickerDialog(
                                             }
                                         )
                                         Spacer(modifier = Modifier.height(2.dp))
-                                        Text(Locales.translate("hex", lang), fontSize = 8.sp, color = Color.Gray)
+                                        Text(Locales.translate("hex", lang), fontSize = 8.sp, color = Color(0xFF8E96A3))
                                     }
 
                                     RGBFieldDark("R", r) { nv -> updateStopColor(stops, selectedStopIndex, Color(nv, g, b)) { stops = it } }
@@ -1132,26 +1398,17 @@ fun GradientPickerDialog(
                         horizontalArrangement = Arrangement.End,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        TextButton(
-                            onClick = onDismiss,
-                            colors = ButtonDefaults.textButtonColors(contentColor = Color.Gray)
-                        ) {
-                            Text(Locales.translate("cancel", lang), fontSize = 12.sp)
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Button(
+                        StudioGhostButton(Locales.translate("cancel", lang), onDismiss)
+                        StudioPrimaryButton(
+                            label = Locales.translate("save_close", lang),
                             onClick = { 
                                 val result = stops.joinToString(";") { 
                                     "${it.position}:${(it.color.red * 255).roundToInt()},${(it.color.green * 255).roundToInt()},${(it.color.blue * 255).roundToInt()}" 
                                 }
                                 onSave(result)
                                 onDismiss() 
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0, 162, 255), contentColor = Color.White),
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            Text(Locales.translate("save_close", lang), fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        }
+                            }
+                        )
                     }
                 }
             }
@@ -1263,475 +1520,6 @@ private fun CircularColorWheel(
             )
         }
     }
-}
-
-@Composable
-fun GradientPickerDialogOld(
-    initialColorString: String,
-    onDismiss: () -> Unit,
-    onSave: (String) -> Unit,
-    lang: String = "vi"
-) {
-    // Parse initial string: "r,g,b to r,g,b" or "pos:r,g,b;pos:r,g,b"
-    val initialStops = remember(initialColorString) {
-        try {
-            if (initialColorString.contains(";")) {
-                initialColorString.split(";").map { part ->
-                    val segments = part.split(":")
-                    val pos = segments[0].toFloat()
-                    val rgb = segments[1].split(",").map { it.trim().toInt() }
-                    GradientStop(pos, Color(rgb[0], rgb[1], rgb[2]))
-                }
-            } else if (initialColorString.contains(" to ")) {
-                val parts = initialColorString.split(" to ")
-                val c1 = parts[0].split(",").map { it.trim().toInt() }
-                val c2 = parts[1].split(",").map { it.trim().toInt() }
-                listOf(
-                    GradientStop(0f, Color(c1[0], c1[1], c1[2])),
-                    GradientStop(1f, Color(c2[0], c2[1], c2[2]))
-                )
-            } else {
-                listOf(GradientStop(0f, Color.White), GradientStop(1f, Color.Black))
-            }
-        } catch (e: Exception) {
-            listOf(GradientStop(0f, Color.White), GradientStop(1f, Color.Black))
-        }
-    }
-
-    var stops by remember { mutableStateOf(initialStops.sortedBy { it.position }) }
-    var selectedStopIndex by remember { mutableStateOf(0) }
-
-    // Custom dark Figma-like design dialog
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
-        modifier = Modifier
-            .fillMaxWidth(0.95f)
-            .padding(16.dp),
-        title = { 
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(8.dp)
-                        .background(
-                            Brush.linearGradient(listOf(Color(0xFF3B82F6), Color(0xFFEC4899))),
-                            CircleShape
-                        )
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    "Advanced Gradient Stop Editor", 
-                    fontSize = 15.sp, 
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-                Spacer(Modifier.weight(1f))
-                IconButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.size(24.dp)
-                ) {
-                    Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.LightGray, modifier = Modifier.size(16.dp))
-                }
-            }
-        },
-        text = {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // Main Gradient Showcase Card
-                Card(
-                    shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, Color(60, 60, 65)),
-                    colors = CardDefaults.cardColors(containerColor = Color(28, 28, 32)),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text("Gradient Preview", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Color.Gray)
-                        
-                        // Main Gradient Strip
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(56.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(
-                                    Brush.linearGradient(
-                                        colorStops = stops.map { it.position to it.color }.toTypedArray()
-                                    )
-                                )
-                                .border(1.dp, Color(50, 50, 55), RoundedCornerShape(8.dp))
-                        )
-                    }
-                }
-
-                // Interactive Stops Control Strip (DPI-Responsive & Drag-Optimized)
-                Card(
-                    shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, Color(60, 60, 65)),
-                    colors = CardDefaults.cardColors(containerColor = Color(20, 20, 24)),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("Gradient Stops Track", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Color.Gray)
-                            Spacer(Modifier.weight(1f))
-                            Text("Click track to add • Drag nodes", fontSize = 10.sp, color = Color(0, 162, 255))
-                        }
-                        
-                        // Interactive slider track
-                        BoxWithConstraints(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(44.dp)
-                                .pointerInput(stops) {
-                                    detectTapGestures { offset ->
-                                        val w = size.width.toFloat()
-                                        val pos = (offset.x / w).coerceIn(0f, 1f)
-                                        // Check if clicked near an existing stop
-                                        val threshold = 0.05f
-                                        val existing = stops.find { Math.abs(it.position - pos) < threshold }
-                                        if (existing == null) {
-                                            val newColor = interpolateColor(stops, pos)
-                                            val updated = (stops + GradientStop(pos, newColor)).sortedBy { it.position }
-                                            stops = updated
-                                            selectedStopIndex = updated.indexOfFirst { Math.abs(it.position - pos) < 0.001f }
-                                        } else {
-                                            selectedStopIndex = stops.indexOf(existing)
-                                        }
-                                    }
-                                }
-                        ) {
-                            val trackWidthPx = constraints.maxWidth.toFloat()
-                            val trackWidthDp = maxWidth
-                            
-                            // Visual horizontal timeline track line
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(6.dp)
-                                    .align(Alignment.Center)
-                                    .clip(RoundedCornerShape(3.dp))
-                                    .background(Color(45, 45, 50))
-                            )
-
-                            // Render stops markers
-                            stops.forEachIndexed { index, stop ->
-                                val isSelected = index == selectedStopIndex
-                                val offsetDp = (stop.position * trackWidthDp.value).dp - 12.dp
-                                
-                                Box(
-                                    modifier = Modifier
-                                        .offset(x = offsetDp)
-                                        .size(24.dp)
-                                        .align(Alignment.CenterStart)
-                                        .pointerInput(index) {
-                                            detectDragGestures(
-                                                onDragStart = { selectedStopIndex = index },
-                                                onDrag = { change, dragAmount ->
-                                                    change.consume()
-                                                    val deltaPct = dragAmount.x / trackWidthPx
-                                                    val rawPos = (stops[index].position + deltaPct).coerceIn(0f, 1f)
-                                                    
-                                                    // Maintain order or re-sort
-                                                    val updatedStops = stops.toMutableList().apply {
-                                                        this[index] = this[index].copy(position = rawPos)
-                                                    }.sortedBy { it.position }
-                                                    
-                                                    stops = updatedStops
-                                                    selectedStopIndex = updatedStops.indexOfFirst { 
-                                                        Math.abs(it.position - rawPos) < 0.005f && it.color == stop.color 
-                                                    }.coerceIn(0, updatedStops.size - 1)
-                                                }
-                                            )
-                                        },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    // Glow or circle ring
-                                    Box(
-                                        modifier = Modifier
-                                            .size(20.dp)
-                                            .background(
-                                                if (isSelected) Color(0, 162, 255) else Color(40, 40, 45),
-                                                CircleShape
-                                            )
-                                            .border(
-                                                if (isSelected) 2.dp else 1.dp,
-                                                if (isSelected) Color.White else Color.Gray,
-                                                CircleShape
-                                            )
-                                    )
-                                    
-                                    // Color sample dot inside
-                                    Box(
-                                        modifier = Modifier
-                                            .size(12.dp)
-                                            .background(stop.color, CircleShape)
-                                            .border(1.dp, Color.White.copy(alpha = 0.5f), CircleShape)
-                                    )
-                                }
-                            }
-                        }
-
-                        Spacer(Modifier.height(8.dp))
-                        // Stop selection chips
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState())
-                                .padding(vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            stops.forEachIndexed { index, stop ->
-                                val isSelected = index == selectedStopIndex
-                                Row(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(if (isSelected) Color(0, 162, 255).copy(alpha = 0.2f) else Color(30, 30, 35))
-                                        .border(1.dp, if (isSelected) Color(0, 162, 255) else Color(50, 50, 55), RoundedCornerShape(8.dp))
-                                        .clickable { selectedStopIndex = index }
-                                        .padding(horizontal = 10.dp, vertical = 6.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(12.dp)
-                                            .background(stop.color, CircleShape)
-                                            .border(1.dp, Color.White.copy(0.4f), CircleShape)
-                                    )
-                                    Text(
-                                        text = "Point ${index + 1} (${(stop.position * 100).roundToInt()}%)",
-                                        color = if (isSelected) Color.White else Color.LightGray,
-                                        fontSize = 10.sp,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Selected Stop Color Customization Area
-                if (selectedStopIndex in stops.indices) {
-                    val currentStop = stops[selectedStopIndex]
-                    
-                    // Parse RGB to HSV for visual picker
-                    val hsv = remember(currentStop.color) { colorToHSV(currentStop.color) }
-                    var hue by remember(currentStop.color) { mutableStateOf(hsv[0]) }
-                    var saturation by remember(currentStop.color) { mutableStateOf(hsv[1]) }
-                    var value by remember(currentStop.color) { mutableStateOf(hsv[2]) }
-
-                    Card(
-                        shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, Color(65, 65, 70)),
-                        colors = CardDefaults.cardColors(containerColor = Color(28, 28, 32)),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(14.dp), 
-                            verticalArrangement = Arrangement.spacedBy(14.dp)
-                        ) {
-                            // Header of current stop settings
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(16.dp)
-                                        .background(currentStop.color, RoundedCornerShape(4.dp))
-                                        .border(1.dp, Color.White.copy(0.4f), RoundedCornerShape(4.dp))
-                                )
-                                Spacer(Modifier.width(8.dp))
-                                Text(
-                                    "Stop Color Settings (${selectedStopIndex + 1})", 
-                                    fontWeight = FontWeight.Bold, 
-                                    fontSize = 12.sp,
-                                    color = Color.White
-                                )
-                                Spacer(Modifier.weight(1f))
-                                if (stops.size > 2) {
-                                    IconButton(
-                                        onClick = {
-                                            stops = stops.toMutableList().apply { removeAt(selectedStopIndex) }
-                                            selectedStopIndex = 0
-                                        }, 
-                                        modifier = Modifier.size(24.dp)
-                                    ) {
-                                        Icon(Icons.Default.Delete, contentDescription = "Delete Stop", tint = Color(0xFFEF4444), modifier = Modifier.size(16.dp))
-                                    }
-                                }
-                            }
-
-                            // Precise Stop Position Input / Slider
-                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Text("Stop Position", fontSize = 11.sp, color = Color.Gray)
-                                    Spacer(Modifier.weight(1f))
-                                    Text("${(currentStop.position * 100).roundToInt()}%", fontSize = 11.sp, color = Color(0, 162, 255), fontWeight = FontWeight.Bold)
-                                }
-                                Slider(
-                                    value = currentStop.position,
-                                    onValueChange = { newPos ->
-                                        stops = stops.toMutableList().apply {
-                                            this[selectedStopIndex] = this[selectedStopIndex].copy(position = newPos)
-                                        }.sortedBy { it.position }
-                                        selectedStopIndex = stops.indexOfFirst { 
-                                            Math.abs(it.position - newPos) < 0.005f && it.color == currentStop.color 
-                                        }.coerceIn(0, stops.size - 1)
-                                    },
-                                    colors = SliderDefaults.colors(
-                                        activeTrackColor = Color(0, 162, 255),
-                                        inactiveTrackColor = Color(55, 55, 60),
-                                        thumbColor = Color.White
-                                    )
-                                )
-                            }
-
-                            Divider(color = Color(50, 50, 55), thickness = 1.dp)
-
-                            // VISUAL COLOR PICKER: Hue, Saturation, Value sliders (Figma Style)
-                            Text("Visual Color Mixer", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
-
-                            // 1. Hue Spectrum Slider
-                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Row {
-                                    Text("Hue", fontSize = 10.sp, color = Color.LightGray)
-                                    Spacer(Modifier.weight(1f))
-                                    Text("${hue.roundToInt()}°", fontSize = 10.sp, color = Color.Gray)
-                                }
-                                val hueColors = listOf(
-                                    Color.Red, Color.Yellow, Color.Green, Color.Cyan, Color.Blue, Color.Magenta, Color.Red
-                                )
-                                UpgradedSlider(
-                                    value = hue,
-                                    onValueChange = { newHue ->
-                                        hue = newHue
-                                        val updatedColor = hsvToColor(hue, saturation, value)
-                                        updateStopColor(stops, selectedStopIndex, updatedColor) { stops = it }
-                                    },
-                                    range = 0f..360f,
-                                    trackBrush = Brush.horizontalGradient(hueColors)
-                                )
-                            }
-
-                            // 2. Saturation Slider (Gradually saturates the color)
-                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Row {
-                                    Text("Saturation", fontSize = 10.sp, color = Color.LightGray)
-                                    Spacer(Modifier.weight(1f))
-                                    Text("${(saturation * 100).roundToInt()}%", fontSize = 10.sp, color = Color.Gray)
-                                }
-                                val satStart = hsvToColor(hue, 0f, value)
-                                val satEnd = hsvToColor(hue, 1f, value)
-                                UpgradedSlider(
-                                    value = saturation,
-                                    onValueChange = { newSat ->
-                                        saturation = newSat
-                                        val updatedColor = hsvToColor(hue, saturation, value)
-                                        updateStopColor(stops, selectedStopIndex, updatedColor) { stops = it }
-                                    },
-                                    range = 0f..1f,
-                                    trackBrush = Brush.horizontalGradient(listOf(satStart, satEnd))
-                                )
-                            }
-
-                            // 3. Brightness / Value Slider
-                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Row {
-                                    Text("Brightness", fontSize = 10.sp, color = Color.LightGray)
-                                    Spacer(Modifier.weight(1f))
-                                    Text("${(value * 100).roundToInt()}%", fontSize = 10.sp, color = Color.Gray)
-                                }
-                                val valStart = hsvToColor(hue, saturation, 0f)
-                                val valEnd = hsvToColor(hue, saturation, 1f)
-                                UpgradedSlider(
-                                    value = value,
-                                    onValueChange = { newVal ->
-                                        value = newVal
-                                        val updatedColor = hsvToColor(hue, saturation, value)
-                                        updateStopColor(stops, selectedStopIndex, updatedColor) { stops = it }
-                                    },
-                                    range = 0f..1f,
-                                    trackBrush = Brush.horizontalGradient(listOf(valStart, valEnd))
-                                )
-                            }
-
-                            // RGB & Hex input panel
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                val r = (currentStop.color.red * 255).roundToInt()
-                                val g = (currentStop.color.green * 255).roundToInt()
-                                val b = (currentStop.color.blue * 255).roundToInt()
-
-                                // Hex input (Figma style)
-                                var hexText by remember(currentStop.color) { mutableStateOf(colorToHex(currentStop.color)) }
-                                OutlinedTextField(
-                                    value = hexText,
-                                    onValueChange = { input ->
-                                        hexText = input
-                                        val parsed = hexToColor(input)
-                                        if (parsed != null) {
-                                            updateStopColor(stops, selectedStopIndex, parsed) { stops = it }
-                                        }
-                                    },
-                                    label = { Text("HEX", fontSize = 9.sp) },
-                                    singleLine = true,
-                                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 11.sp, color = Color.White),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = Color(0, 162, 255),
-                                        unfocusedBorderColor = Color(70, 70, 75),
-                                        focusedContainerColor = Color(20, 20, 24),
-                                        unfocusedContainerColor = Color(20, 20, 24)
-                                    ),
-                                    modifier = Modifier.weight(1.3f)
-                                )
-
-                                RGBFieldDark("R", r) { nv -> updateStopColor(stops, selectedStopIndex, Color(nv, g, b)) { stops = it } }
-                                RGBFieldDark("G", g) { nv -> updateStopColor(stops, selectedStopIndex, Color(r, nv, b)) { stops = it } }
-                                RGBFieldDark("B", b) { nv -> updateStopColor(stops, selectedStopIndex, Color(r, g, nv)) { stops = it } }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = { 
-                    val result = stops.joinToString(";") { 
-                        "${it.position}:${(it.color.red * 255).roundToInt()},${(it.color.green * 255).roundToInt()},${(it.color.blue * 255).roundToInt()}" 
-                    }
-                    onSave(result)
-                    onDismiss() 
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0, 162, 255), contentColor = Color.White),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Text("Apply Gradient", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-            }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = onDismiss,
-                colors = ButtonDefaults.textButtonColors(contentColor = Color.Gray)
-            ) {
-                Text("Cancel", fontSize = 12.sp)
-            }
-        },
-        containerColor = Color(24, 24, 28)
-    )
 }
 
 @Composable

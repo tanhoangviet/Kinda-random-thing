@@ -90,4 +90,35 @@ class LuauGeneratorTest {
     assertTrue(bundle.contains("===== src/client/main-gui.client.lua ====="))
     assertTrue(bundle.contains("local playerGui = player:WaitForChild(\"PlayerGui\")"))
   }
+
+  @Test
+  fun imageUrlExportsCustomAssetLoader() {
+    val root = RobloxObject(
+      id = "root",
+      className = RobloxClass.ScreenGui,
+      name = "Main Gui",
+      properties = mapOf("ResetOnSpawn" to true, "Enabled" to true),
+      children = listOf(
+        RobloxObject(
+          id = "image",
+          className = RobloxClass.ImageLabel,
+          name = "Promo Image",
+          properties = mapOf(
+            "Image" to "https://example.com/assets/promo.png",
+            "Size" to UDim2(0f, 320, 0f, 180),
+          ),
+        ),
+      ),
+    )
+
+    val code = LuauGenerator.generate(root)
+
+    assertTrue(code.startsWith("--!strict"))
+    assertTrue(code.contains("local function loadCustomImage"))
+    assertTrue(code.contains("writefileFn"))
+    assertTrue(code.contains("readfileFn"))
+    assertTrue(code.contains("getCustomAssetFn"))
+    assertTrue(code.contains("GUI[\"GUI_PromoImage\"][\"Image\"] = loadCustomImage(\"https://example.com/assets/promo.png\", \"vanilla_asset_"))
+    assertFalse(code.contains("GUI[\"GUI_PromoImage\"][\"Image\"] = \"https://example.com/assets/promo.png\""))
+  }
 }

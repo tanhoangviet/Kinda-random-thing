@@ -7,7 +7,9 @@ object LuauGenerator {
 
     fun generate(root: RobloxObject, style: String = "Standard", includeMountCode: Boolean = true): String {
         val sb = StringBuilder()
+        val needsCustomAssetLoader = hasExternalImage(root)
         
+        sb.append("--!strict\n")
         sb.append("--[[\n")
         sb.append("    Generated with Roblox UI Designer Mobile")
         if (style.isNotBlank()) {
@@ -20,13 +22,17 @@ object LuauGenerator {
         sb.append("]]\n\n")
         if (includeMountCode) {
             sb.append("local Players = game:GetService(\"Players\")\n")
-            sb.append("local player = Players.LocalPlayer\n")
-            sb.append("local playerGui = player:WaitForChild(\"PlayerGui\")\n\n")
+            sb.append("local player = Players.LocalPlayer :: Player\n")
+            sb.append("local playerGui = player:WaitForChild(\"PlayerGui\") :: PlayerGui\n\n")
         } else {
             sb.append("-- Paste this in a LocalScript inside your ScreenGui\n\n")
         }
+
+        if (needsCustomAssetLoader) {
+            appendCustomAssetLoader(sb)
+        }
         
-        sb.append("local GUI = {}\n\n")
+        sb.append("local GUI: {[string]: any} = {}\n\n")
         
         val keys = mutableMapOf<String, String>()
         val keyCounters = mutableMapOf<String, Int>()
@@ -203,22 +209,35 @@ object LuauGenerator {
 
         val fileName = safeAssetFileName(trimmed)
         val assetPath = fileName
-        return buildString {
-            appendLine("do")
-            appendLine("\tlocal imageUrl = ${formatLuauString(trimmed)}")
-            appendLine("\tlocal imagePath = ${formatLuauString(assetPath)}")
-            appendLine("\tif typeof(writefile) == \"function\" and typeof(readfile) == \"function\" and typeof(isfile) == \"function\" and typeof(getcustomasset) == \"function\" then")
-            appendLine("\t\tlocal hasFile = isfile(imagePath)")
-            appendLine("\t\tlocal cachedData = hasFile and readfile(imagePath) or nil")
-            appendLine("\t\tif not hasFile or cachedData == nil or #cachedData == 0 then")
-            appendLine("\t\t\twritefile(imagePath, game:HttpGet(imageUrl))")
-            appendLine("\t\tend")
-            appendLine("\t\tGUI[\"$key\"][\"Image\"] = getcustomasset(imagePath)")
-            appendLine("\telse")
-            appendLine("\t\tGUI[\"$key\"][\"Image\"] = imageUrl")
-            appendLine("\tend")
-            appendLine("end")
-        }
+        return "GUI[\"$key\"][\"Image\"] = loadCustomImage(${formatLuauString(trimmed)}, ${formatLuauString(assetPath)})\n"
+    }
+
+    private fun appendCustomAssetLoader(sb: StringBuilder) {
+        sb.appendLine("local executorEnv = getfenv() :: any")
+        sb.appendLine("local writefileFn = executorEnv.writefile")
+        sb.appendLine("local readfileFn = executorEnv.readfile")
+        sb.appendLine("local isfileFn = executorEnv.isfile")
+        sb.appendLine("local getCustomAssetFn = executorEnv.getcustomasset or executorEnv.GetCustomAsset")
+        sb.appendLine()
+        sb.appendLine("local function loadCustomImage(imageUrl: string, imagePath: string): string")
+        sb.appendLine("\tif typeof(writefileFn) == \"function\" and typeof(readfileFn) == \"function\" and typeof(isfileFn) == \"function\" and typeof(getCustomAssetFn) == \"function\" then")
+        sb.appendLine("\t\tlocal hasFile = isfileFn(imagePath)")
+        sb.appendLine("\t\tlocal cachedData = if hasFile then readfileFn(imagePath) else nil")
+        sb.appendLine("\t\tif not hasFile or type(cachedData) ~= \"string\" or #cachedData == 0 then")
+        sb.appendLine("\t\t\tlocal ok, result = pcall(function()")
+        sb.appendLine("\t\t\t\treturn (game :: any):HttpGet(imageUrl)")
+        sb.appendLine("\t\t\tend)")
+        sb.appendLine("\t\t\tif ok and type(result) == \"string\" and #result > 0 then")
+        sb.appendLine("\t\t\t\twritefileFn(imagePath, result)")
+        sb.appendLine("\t\t\telse")
+        sb.appendLine("\t\t\t\twarn(\"Vanilla image download failed\", imageUrl, result)")
+        sb.appendLine("\t\t\tend")
+        sb.appendLine("\t\tend")
+        sb.appendLine("\t\treturn getCustomAssetFn(imagePath)")
+        sb.appendLine("\tend")
+        sb.appendLine("\treturn imageUrl")
+        sb.appendLine("end")
+        sb.appendLine()
     }
 
     private fun isUDimProperty(className: RobloxClass, propName: String): Boolean {
@@ -304,6 +323,14 @@ object LuauGenerator {
             .takeIf { it.matches("[a-z0-9]{2,5}".toRegex()) }
             ?: "png"
         return "vanilla_asset_${Integer.toHexString(value.hashCode())}.$extension"
+    }
+
+    private fun hasExternalImage(obj: RobloxObject): Boolean {
+        val image = obj.properties["Image"] as? String
+        if (image != null && (image.startsWith("http://", ignoreCase = true) || image.startsWith("https://", ignoreCase = true))) {
+            return true
+        }
+        return obj.children.any { hasExternalImage(it) }
     }
     
     private fun isPropertyRelevant(className: RobloxClass, propName: String): Boolean {
