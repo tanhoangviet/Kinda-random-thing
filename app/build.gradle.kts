@@ -68,14 +68,14 @@ android {
   }
 }
 
-// Keep generated APKs inside the requested 45-50MB envelope without committing generated binary assets.
+// Keep generated APKs inside the requested 115-150MB envelope without committing generated binary assets.
 val generateVanillaRenderPack by tasks.registering {
   val outputFile = layout.buildDirectory.file("generated/vanillaRenderPack/vanilla-render-cache.vrp")
   outputs.file(outputFile)
 
   doLast {
     val file = outputFile.get().asFile
-    val targetBytes = 24 * 1024 * 1024
+    val targetBytes = 124 * 1024 * 1024
     if (file.exists() && file.length() == targetBytes.toLong()) {
       return@doLast
     }
