@@ -41,7 +41,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     private val _currentProjectDescription = MutableStateFlow("Designed on Mobile")
     val currentProjectDescription: StateFlow<String> = _currentProjectDescription.asStateFlow()
 
-    private val initialDevicePreview = settingsPrefs.getString("devicePreview", "Phone 16:9") ?: "Phone 16:9"
+    private val initialDevicePreview = "Roblox Scale"
     private val initialScreenSize = screenSizeForDevice(initialDevicePreview)
 
     private val _screenWidth = MutableStateFlow(initialScreenSize.first)
@@ -81,7 +81,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     private val _gridSize = MutableStateFlow(settingsPrefs.getInt("gridSize", 10).coerceIn(4, 64))
     val gridSize: StateFlow<Int> = _gridSize.asStateFlow()
 
-    private val _devicePreviewType = MutableStateFlow(initialDevicePreview) // "Phone 16:9", "Phone 20:9", "Tablet", "Desktop"
+    private val _devicePreviewType = MutableStateFlow(initialDevicePreview)
     val devicePreviewType: StateFlow<String> = _devicePreviewType.asStateFlow()
 
     private val _language = MutableStateFlow(settingsPrefs.getString("language", "vi") ?: "vi") // "en" or "vi"
@@ -129,11 +129,12 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
 
     fun loadProject(entity: ProjectEntity) {
         saveHistoryState()
+        val (width, height) = screenSizeForDevice("Roblox Scale")
         _currentProjectId.value = entity.id
         _currentProjectName.value = entity.name
         _currentProjectDescription.value = entity.description
-        _screenWidth.value = entity.screenWidth
-        _screenHeight.value = entity.screenHeight
+        _screenWidth.value = width
+        _screenHeight.value = height
         
         try {
             val json = JSONObject(entity.rootJson)
@@ -149,9 +150,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         try {
             val json = JSONObject(jsonString)
             val name = json.optString("projectName", "Imported Project")
-            val screen = json.optJSONObject("screenSize")
-            val width = screen?.optInt("width", 1280) ?: 1280
-            val height = screen?.optInt("height", 720) ?: 720
+            val (width, height) = screenSizeForDevice("Roblox Scale")
             
             val objectsArray = json.getJSONArray("objects")
             if (objectsArray.length() > 0) {
@@ -309,9 +308,10 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun setDevicePreview(device: String) {
-        _devicePreviewType.value = device
-        settingsPrefs.edit().putString("devicePreview", device).apply()
-        val (width, height) = screenSizeForDevice(device)
+        val normalizedDevice = "Roblox Scale"
+        _devicePreviewType.value = normalizedDevice
+        settingsPrefs.edit().putString("devicePreview", normalizedDevice).apply()
+        val (width, height) = screenSizeForDevice(normalizedDevice)
         _screenWidth.value = width
         _screenHeight.value = height
         triggerAutosave()
@@ -694,12 +694,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private fun screenSizeForDevice(device: String): Pair<Int, Int> {
-        return when (device) {
-            "Phone 20:9" -> 1600 to 720
-            "Tablet" -> 1024 to 768
-            "Desktop" -> 1920 to 1080
-            else -> 1280 to 720
-        }
+        return 1280 to 720
     }
 
     private fun updateObjectInTree(

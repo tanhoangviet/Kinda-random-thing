@@ -181,6 +181,9 @@ fun createDefaultObject(className: RobloxClass, customName: String? = null): Rob
         RobloxClass.ScreenGui -> {
             properties["ResetOnSpawn"] = true
             properties["Enabled"] = true
+            properties["IgnoreGuiInset"] = true
+            properties["DisplayOrder"] = 999
+            properties["ZIndexBehavior"] = "Sibling"
         }
         RobloxClass.Folder -> {
             // Folder intentionally has no visual properties.

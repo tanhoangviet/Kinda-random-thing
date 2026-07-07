@@ -65,7 +65,6 @@ fun MainWorkspace(
     val showGrid by viewModel.showGrid.collectAsState()
     val snapToGrid by viewModel.snapToGrid.collectAsState()
     val gridSize by viewModel.gridSize.collectAsState()
-    val devicePreview by viewModel.devicePreviewType.collectAsState()
     val screenWidth by viewModel.screenWidth.collectAsState()
     val screenHeight by viewModel.screenHeight.collectAsState()
     val savedProjects by viewModel.savedProjects.collectAsState()
@@ -156,8 +155,17 @@ fun MainWorkspace(
     }
 
     fun openExportDialog() {
-        generatedLuauCode = LuauGenerator.generate(rootObj)
-        generatedRojoBundle = LuauGenerator.generateRojoBundle(rootObj, projectName)
+        generatedLuauCode = LuauGenerator.generate(
+            root = rootObj,
+            canvasWidth = screenWidth,
+            canvasHeight = screenHeight
+        )
+        generatedRojoBundle = LuauGenerator.generateRojoBundle(
+            root = rootObj,
+            projectName = projectName,
+            canvasWidth = screenWidth,
+            canvasHeight = screenHeight
+        )
         showExportDialog = true
     }
 
@@ -190,7 +198,6 @@ fun MainWorkspace(
             if (isTopbarVisible) {
                 StudioTopBar(
                     projectName = projectName,
-                    devicePreview = devicePreview,
                     isCompact = isCompact,
                     savedProjects = savedProjects,
 	                    showGrid = showGrid,
@@ -390,25 +397,10 @@ fun MainWorkspace(
 
                             VerticalDivider(modifier = Modifier.height(14.dp), color = Color.Gray)
 
-                            // Device Preview drop-down selection
-                            var showDevices by remember { mutableStateOf(false) }
-                            Box {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.clickable { showDevices = true }
-                                ) {
-                                    Image(painterResource(R.drawable.vanilla_action_device), contentDescription = null, modifier = Modifier.size(20.dp))
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(devicePreview, fontSize = 11.sp, color = Color(0xFFE7EAEE), fontWeight = FontWeight.Bold)
-                                }
-                                DropdownMenu(expanded = showDevices, onDismissRequest = { showDevices = false }) {
-                                    listOf("Phone 16:9", "Phone 20:9", "Tablet", "Desktop").forEach { dev ->
-                                        DropdownMenuItem(
-                                            text = { Text(dev, fontSize = 11.sp) },
-                                            onClick = { viewModel.setDevicePreview(dev); showDevices = false }
-                                        )
-                                    }
-                                }
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Image(painterResource(R.drawable.vanilla_action_device), contentDescription = null, modifier = Modifier.size(20.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Roblox Scale", fontSize = 11.sp, color = Color(0xFFE7EAEE), fontWeight = FontWeight.Bold)
                             }
                         }
 
@@ -503,7 +495,6 @@ fun MainWorkspace(
             StudioStatusBar(
                 selectedObj = selectedObj,
                 projectName = projectName,
-                devicePreview = devicePreview,
 	                canvasScale = canvasScale,
 	                canvasModeLabel = activeScrollObj?.let { "Scrolling: ${it.name}" } ?: "ScreenGui",
 	                showGrid = showGrid,
@@ -939,7 +930,6 @@ private fun TinyTextButton(text: String, accent: Color, onClick: () -> Unit) {
 @Composable
 private fun StudioTopBar(
     projectName: String,
-    devicePreview: String,
     isCompact: Boolean,
     savedProjects: List<ProjectEntity>,
     showGrid: Boolean,
@@ -979,7 +969,6 @@ private fun StudioTopBar(
             Box(modifier = Modifier.weight(1f)) {
                 ProjectTitleMenu(
                     projectName = projectName,
-                    devicePreview = devicePreview,
                     isCompact = isCompact,
                     savedProjects = savedProjects,
                     accentColor = themeColors.accent,
@@ -1153,7 +1142,6 @@ private fun StudioTopBar(
 @Composable
 private fun ProjectTitleMenu(
     projectName: String,
-    devicePreview: String,
     isCompact: Boolean,
     savedProjects: List<ProjectEntity>,
     accentColor: Color,
@@ -1195,7 +1183,7 @@ private fun ProjectTitleMenu(
                             fontWeight = FontWeight.Medium
                         )
                         Text(
-                            text = "  |  $devicePreview  |  Landscape",
+                            text = "  |  Roblox Scale  |  Scale Export",
                             color = Color(0xFFA6ACB3),
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Medium
@@ -1621,7 +1609,6 @@ private fun StudioSidebarRail(
 private fun StudioStatusBar(
     selectedObj: RobloxObject?,
     projectName: String,
-    devicePreview: String,
     canvasScale: Float,
     canvasModeLabel: String,
     showGrid: Boolean,
@@ -1652,7 +1639,7 @@ private fun StudioStatusBar(
             maxLines = 1,
             modifier = Modifier.weight(1.4f)
         )
-	        Text(devicePreview, color = Color(0xFFA6ACB3), fontSize = 10.sp)
+	        Text("Roblox Scale", color = Color(0xFFA6ACB3), fontSize = 10.sp)
 	        Text(canvasModeLabel, color = Color(0xFF8FBFF8), fontSize = 10.sp, maxLines = 1)
 	        Text("Zoom ${(canvasScale * 100).toInt()}%", color = Color(0xFFA6ACB3), fontSize = 10.sp)
         Text(

@@ -5,7 +5,13 @@ import java.util.Locale
 
 object LuauGenerator {
 
-    fun generate(root: RobloxObject, style: String = "Standard", includeMountCode: Boolean = true): String {
+    fun generate(
+        root: RobloxObject,
+        style: String = "Standard",
+        includeMountCode: Boolean = true,
+        canvasWidth: Int = 1280,
+        canvasHeight: Int = 720
+    ): String {
         val sb = StringBuilder()
         val needsCustomAssetLoader = hasExternalImage(root)
         
@@ -17,8 +23,8 @@ object LuauGenerator {
         }
         sb.append("\n")
         sb.append("    ----------------------------------------\n")
-        sb.append("    - Hướng dẫn: Bạn có thể sử dụng StyLua để tự động định dạng (format) lại đoạn mã này.\n")
-        sb.append("    - Hướng dẫn: Sử dụng Darklua để build/bundle, tối ưu hóa hoặc rút gọn (minify) code.\n")
+        sb.append("    - Strict Luau, StyLua-friendly formatting, and Darklua-ready output.\n")
+        sb.append("    - GUI coordinates are normalized to scale so the UI fits every Roblox viewport.\n")
         sb.append("]]\n\n")
         if (includeMountCode) {
             sb.append("local Players = game:GetService(\"Players\")\n")
@@ -53,8 +59,16 @@ object LuauGenerator {
             return uniqueKey
         }
         
-        fun generateObjectCode(obj: RobloxObject, parentKey: String?) {
+        fun generateObjectCode(
+            obj: RobloxObject,
+            parentKey: String?,
+            parentW: Float,
+            parentH: Float,
+            depth: Int,
+            siblingIndex: Int
+        ) {
             val key = getObjectKey(obj)
+            val objectBounds = resolveObjectExportBounds(obj, parentW, parentH)
             
             sb.append("-- ${obj.className.name}: ${obj.name}\n")
             if (parentKey == null && !includeMountCode) {
@@ -68,6 +82,8 @@ object LuauGenerator {
             obj.properties.forEach { (name, value) ->
                 val exportName = normalizeExportPropertyName(obj.className, name)
                 if (isPropertyRelevant(obj.className, exportName)) {
+                    val propertyParentW = if (exportName == "CanvasSize") objectBounds.first else parentW
+                    val propertyParentH = if (exportName == "CanvasSize") objectBounds.second else parentH
                     if (obj.className in listOf(RobloxClass.ImageLabel, RobloxClass.ImageButton) && exportName == "Image" && value is String) {
                         val customAssetCode = formatCustomImageAssetAssignment(key, value)
                         if (customAssetCode != null) {
@@ -79,11 +95,21 @@ object LuauGenerator {
                         sb.append(formatPath2DControlPoints(key, value))
                         return@forEach
                     }
-                    val formatted = formatPropertyValue(obj.className, exportName, value)
+                    val formatted = formatPropertyValue(
+                        className = obj.className,
+                        propName = exportName,
+                        value = value,
+                        parentW = propertyParentW,
+                        parentH = propertyParentH,
+                        siblingIndex = siblingIndex
+                    )
                     if (formatted != null) {
                         sb.append("GUI[\"$key\"][\"$exportName\"] = $formatted\n")
                     }
                 }
+            }
+            if (obj.className == RobloxClass.ScreenGui) {
+                appendScreenGuiExportDefaults(sb, key, obj)
             }
             
             // Assign parent
@@ -97,18 +123,37 @@ object LuauGenerator {
             sb.append("\n")
             
             // Generate for children
-            obj.children.forEach { child ->
-                generateObjectCode(child, key)
+            obj.children.forEachIndexed { index, child ->
+                generateObjectCode(
+                    obj = child,
+                    parentKey = key,
+                    parentW = objectBounds.first,
+                    parentH = objectBounds.second,
+                    depth = depth + 1,
+                    siblingIndex = index
+                )
             }
         }
         
-        generateObjectCode(root, null)
+        generateObjectCode(
+            obj = root,
+            parentKey = null,
+            parentW = canvasWidth.coerceAtLeast(1).toFloat(),
+            parentH = canvasHeight.coerceAtLeast(1).toFloat(),
+            depth = 0,
+            siblingIndex = 0
+        )
         
         sb.append("return GUI\n")
         return sb.toString()
     }
 
-    fun generateRojoBundle(root: RobloxObject, projectName: String = "Vanilla UI"): String {
+    fun generateRojoBundle(
+        root: RobloxObject,
+        projectName: String = "Vanilla UI",
+        canvasWidth: Int = 1280,
+        canvasHeight: Int = 720
+    ): String {
         val safeProjectName = projectName.ifBlank { "Vanilla UI" }
         val scriptFileName = "${safeFileName(root.name)}.client.lua"
         val defaultProjectJson = """
@@ -137,7 +182,15 @@ object LuauGenerator {
             appendLine(defaultProjectJson)
             appendLine()
             appendLine("===== src/client/$scriptFileName =====")
-            append(generate(root = root, style = "Rojo", includeMountCode = true))
+            append(
+                generate(
+                    root = root,
+                    style = "Rojo",
+                    includeMountCode = true,
+                    canvasWidth = canvasWidth,
+                    canvasHeight = canvasHeight
+                )
+            )
         }
     }
     
@@ -171,6 +224,18 @@ object LuauGenerator {
             "BottomLeft" -> "BottomLeftRadius"
             "BottomRight" -> "BottomRightRadius"
             else -> propName
+        }
+    }
+
+    private fun appendScreenGuiExportDefaults(sb: StringBuilder, key: String, obj: RobloxObject) {
+        if (!obj.properties.containsKey("IgnoreGuiInset")) {
+            sb.append("GUI[\"$key\"][\"IgnoreGuiInset\"] = true\n")
+        }
+        if (!obj.properties.containsKey("DisplayOrder")) {
+            sb.append("GUI[\"$key\"][\"DisplayOrder\"] = 999\n")
+        }
+        if (!obj.properties.containsKey("ZIndexBehavior")) {
+            sb.append("GUI[\"$key\"][\"ZIndexBehavior\"] = Enum.ZIndexBehavior.Sibling\n")
         }
     }
 
@@ -209,7 +274,14 @@ object LuauGenerator {
         }
     }
     
-    private fun formatPropertyValue(className: RobloxClass, propName: String, value: Any): String? {
+    private fun formatPropertyValue(
+        className: RobloxClass,
+        propName: String,
+        value: Any,
+        parentW: Float,
+        parentH: Float,
+        siblingIndex: Int
+    ): String? {
         if (className == RobloxClass.UIGradient && propName == "Color" && value is String) {
             return formatGradientColor(value)
         }
@@ -221,6 +293,12 @@ object LuauGenerator {
         }
         if (isUDimProperty(className, propName) && value is UDim2) {
             return formatUDim(propName, value)
+        }
+        if (shouldNormalizeScaleProperty(className, propName) && value is UDim2) {
+            return formatScaleUDim2(value, parentW, parentH)
+        }
+        if (propName == "ZIndex" && value is Int) {
+            return normalizeZIndex(value, siblingIndex).toString()
         }
         
         val enumProperties = mapOf(
@@ -235,7 +313,8 @@ object LuauGenerator {
             "ScrollingDirection" to "Enum.ScrollingDirection.",
             "AspectType" to "Enum.AspectType.",
             "DominantAxis" to "Enum.DominantAxis.",
-            "ApplyStrokeMode" to "Enum.ApplyStrokeMode."
+            "ApplyStrokeMode" to "Enum.ApplyStrokeMode.",
+            "ZIndexBehavior" to "Enum.ZIndexBehavior."
         )
 
         if (propName in enumProperties.keys && value is String) {
@@ -248,11 +327,41 @@ object LuauGenerator {
             is Float -> value.toLuauNumber()
             is Double -> value.toLuauNumber()
             is String -> formatLuauString(value, multiline = propName == "Source")
-            is UDim2 -> "UDim2.new(${value.scaleX}, ${value.offsetX}, ${value.scaleY}, ${value.offsetY})"
+            is UDim2 -> "UDim2.new(${value.scaleX.toLuauNumber()}, ${value.offsetX}, ${value.scaleY.toLuauNumber()}, ${value.offsetY})"
             is Vector2 -> "Vector2.new(${value.x}, ${value.y})"
             is Color3 -> "Color3.fromRGB(${value.r}, ${value.g}, ${value.b})"
             else -> null
         }
+    }
+
+    private fun resolveObjectExportBounds(obj: RobloxObject, parentW: Float, parentH: Float): Pair<Float, Float> {
+        val size = obj.properties["Size"] as? UDim2 ?: return parentW.coerceAtLeast(1f) to parentH.coerceAtLeast(1f)
+        val width = ((size.scaleX * parentW) + size.offsetX).coerceAtLeast(1f)
+        val height = ((size.scaleY * parentH) + size.offsetY).coerceAtLeast(1f)
+        return width to height
+    }
+
+    private fun shouldNormalizeScaleProperty(className: RobloxClass, propName: String): Boolean {
+        return propName in listOf("Position", "Size", "CanvasSize") && className in listOf(
+            RobloxClass.Frame,
+            RobloxClass.TextLabel,
+            RobloxClass.TextButton,
+            RobloxClass.ImageLabel,
+            RobloxClass.ImageButton,
+            RobloxClass.ScrollingFrame,
+            RobloxClass.ViewportFrame
+        )
+    }
+
+    private fun formatScaleUDim2(value: UDim2, parentW: Float, parentH: Float): String {
+        val scaleX = (value.scaleX + value.offsetX / parentW.coerceAtLeast(1f)).coerceIn(-10f, 10f)
+        val scaleY = (value.scaleY + value.offsetY / parentH.coerceAtLeast(1f)).coerceIn(-10f, 10f)
+        return "UDim2.new(${scaleX.toLuauNumber()}, 0, ${scaleY.toLuauNumber()}, 0)"
+    }
+
+    private fun normalizeZIndex(value: Int, siblingIndex: Int): Int {
+        val stableDefault = 1 + siblingIndex
+        return maxOf(value, stableDefault).coerceIn(1, 10000)
     }
 
     private fun formatCustomImageAssetAssignment(key: String, image: String): String? {
@@ -456,7 +565,13 @@ object LuauGenerator {
         }
         
         when (className) {
-            RobloxClass.ScreenGui -> return propName in listOf("ResetOnSpawn", "Enabled")
+            RobloxClass.ScreenGui -> return propName in listOf(
+                "ResetOnSpawn",
+                "Enabled",
+                "IgnoreGuiInset",
+                "DisplayOrder",
+                "ZIndexBehavior"
+            )
             RobloxClass.Folder -> return false
             RobloxClass.Frame -> return propName in frameOnlyProps || propName == "ClipsDescendants"
             RobloxClass.TextLabel -> return propName in frameOnlyProps || propName in textOnlyProps
