@@ -93,6 +93,12 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         settingsPrefs.edit().putString("language", next).apply()
     }
 
+    fun setLanguage(language: String) {
+        val next = if (language == "en") "en" else "vi"
+        _language.value = next
+        settingsPrefs.edit().putString("language", next).apply()
+    }
+
     // Undo / Redo Stacks
     private val undoStack = mutableListOf<RobloxObject>()
     private val redoStack = mutableListOf<RobloxObject>()

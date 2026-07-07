@@ -21,6 +21,7 @@ import android.content.Intent
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FolderOpen
@@ -587,10 +588,22 @@ fun ExportLuauDialog(
     val verticalScrollState = rememberScrollState()
     val horizontalScrollState = rememberScrollState()
     var selectedMode by remember { mutableStateOf(0) }
-    val selectedCode = if (selectedMode == 0) luauCode else rojoBundle.ifBlank { luauCode }
+    var editableLuau by remember(luauCode) { mutableStateOf(luauCode) }
+    var editableRojo by remember(rojoBundle, luauCode) { mutableStateOf(rojoBundle.ifBlank { luauCode }) }
+    var styleCheckResult by remember(luauCode, rojoBundle) { mutableStateOf<LuauStyleCheckResult?>(null) }
+    val selectedCode = if (selectedMode == 0) editableLuau else editableRojo
     val shareTitle = if (selectedMode == 0) "Chia se ma Luau" else "Chia se Rojo bundle"
     val codeFontSize = (9f * (uiScalePercent / 100f)).coerceIn(8f, 13f).sp
     val accent = if (selectedMode == 0) Color(0xFF0A84FF) else Color(0xFF28C840)
+
+    fun updateSelectedCode(next: String) {
+        if (selectedMode == 0) {
+            editableLuau = next
+        } else {
+            editableRojo = next
+        }
+        styleCheckResult = null
+    }
 
     fun shareSelectedCode() {
         val sendIntent = Intent().apply {
@@ -630,15 +643,18 @@ fun ExportLuauDialog(
                     Column(modifier = Modifier.weight(1f)) {
                         Text("Export GUI", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                         Text(
-                            "DPI-aware • UI $uiScalePercent% • ${selectedCode.lines().size} lines",
+                            "Editable • UI $uiScalePercent% • ${selectedCode.lines().size} lines",
                             color = Color(0xFFA6ACB3),
                             fontSize = 10.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                     }
-                    IconButton(onClick = { selectedMode = 0 }, modifier = Modifier.size(48.dp)) {
-                        Icon(Icons.Default.Add, contentDescription = "New Luau tab", tint = Color(0xFFE7EAEE))
+                    IconButton(
+                        onClick = { styleCheckResult = runStyluaStyleCheck(selectedCode) },
+                        modifier = Modifier.size(48.dp)
+                    ) {
+                        Icon(Icons.Default.CheckCircle, contentDescription = "StyLua Check", tint = Color(0xFFE7EAEE))
                     }
                     IconButton(onClick = { clipboardManager.setText(AnnotatedString(selectedCode)) }, modifier = Modifier.size(48.dp)) {
                         Icon(Icons.Default.ContentCopy, contentDescription = "Copy", tint = Color(0xFFE7EAEE))
@@ -664,14 +680,20 @@ fun ExportLuauDialog(
                         selected = selectedMode == 0,
                         accent = Color(0xFF0A84FF),
                         modifier = Modifier.weight(1f),
-                        onClick = { selectedMode = 0 }
+                        onClick = {
+                            selectedMode = 0
+                            styleCheckResult = null
+                        }
                     )
                     ExportTabButton(
                         label = "Rojo",
                         selected = selectedMode == 1,
                         accent = Color(0xFF28C840),
                         modifier = Modifier.weight(1f),
-                        onClick = { selectedMode = 1 }
+                        onClick = {
+                            selectedMode = 1
+                            styleCheckResult = null
+                        }
                     )
                 }
 
@@ -684,12 +706,23 @@ fun ExportLuauDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        if (selectedMode == 0) "Runtime LocalScript" else "Rojo project files",
+                        if (selectedMode == 0) "Runtime LocalScript editor" else "Rojo project file editor",
                         color = Color.White,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.weight(1f)
                     )
+                    styleCheckResult?.let { result ->
+                        Text(
+                            result.summary,
+                            color = if (result.ok) Color(0xFF28C840) else Color(0xFFFFBD2E),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(0.8f)
+                        )
+                    }
                     Text("Tab ${selectedMode + 1}/2", color = accent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
 
@@ -700,15 +733,20 @@ fun ExportLuauDialog(
                         .background(Color(0xFF0F1117))
                         .padding(12.dp)
                 ) {
-                    Text(
-                        text = selectedCode,
-                        color = if (selectedMode == 0) Color(0xFF7CFFB2) else Color(0xFF9AD0FF),
-                        fontSize = codeFontSize,
-                        fontFamily = FontFamily.Monospace,
+                    BasicTextField(
+                        value = selectedCode,
+                        onValueChange = { updateSelectedCode(it) },
                         modifier = Modifier
                             .fillMaxSize()
                             .horizontalScroll(horizontalScrollState)
-                            .verticalScroll(verticalScrollState)
+                            .verticalScroll(verticalScrollState),
+                        textStyle = androidx.compose.ui.text.TextStyle(
+                            color = if (selectedMode == 0) Color(0xFF7CFFB2) else Color(0xFF9AD0FF),
+                            fontSize = codeFontSize,
+                            fontFamily = FontFamily.Monospace,
+                            lineHeight = (codeFontSize.value + 7f).sp
+                        ),
+                        cursorBrush = SolidColor(accent)
                     )
                 }
 
@@ -726,6 +764,15 @@ fun ExportLuauDialog(
                         border = BorderStroke(1.dp, Color(0xFF4B5260))
                     ) {
                         Text("Close")
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    OutlinedButton(
+                        onClick = { styleCheckResult = runStyluaStyleCheck(selectedCode) },
+                        border = BorderStroke(1.dp, accent.copy(alpha = 0.7f))
+                    ) {
+                        Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Check")
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(

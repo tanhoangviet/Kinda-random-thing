@@ -45,6 +45,7 @@ fun PropertiesPanel(
     onConvertScaleToOffset: (String) -> Unit,
     onApplyAnchorPreset: (String, String) -> Unit,
     onOpenScript: (String) -> Unit = {},
+    onOpenPathMode: (String) -> Unit = {},
     lang: String = "vi",
     onMinimize: (() -> Unit)? = null,
     modifier: Modifier = Modifier
@@ -512,12 +513,18 @@ fun PropertiesPanel(
                 }
 
                 val points = selectedObj.properties["ControlPoints"] as? String ?: "0.00,0.80;0.26,0.24;0.58,0.66;1.00,0.18"
-                Path2DControlPointEditor(
-                    pointsString = points,
-                    closed = closed,
-                    onPointsChange = { onUpdateProperty(selectedObj.id, "ControlPoints", it) },
-                    modifier = Modifier.fillMaxWidth()
-                )
+                Button(
+                    onClick = { onOpenPathMode(selectedObj.id) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(40.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8B5CF6), contentColor = Color.White),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp)
+                ) {
+                    Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Open Path2D Tab", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
 
                 PropertyRow(label = "Points") {
                     RobloxTextField(

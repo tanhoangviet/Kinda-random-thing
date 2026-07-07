@@ -15,8 +15,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
@@ -55,6 +55,7 @@ fun VSCodeEditorScreen(
     val hasUnsavedChanges = sourceText != savedSnapshot
     val editorScroll = rememberScrollState()
     val horizontalScroll = rememberScrollState()
+    var styleCheckResult by remember(initialSource) { mutableStateOf<LuauStyleCheckResult?>(null) }
     val scriptKind = if (className == RobloxClass.LocalScript) "LocalScript" else "ModuleScript"
     val fileName = if (className == RobloxClass.LocalScript) "$scriptName.client.lua" else "$scriptName.lua"
     val isPath2DContext = className == RobloxClass.LocalScript && contextClassName == RobloxClass.Path2D
@@ -113,6 +114,11 @@ fun VSCodeEditorScreen(
                     }
                     context.startActivity(Intent.createChooser(sendIntent, "Chia se ma script"))
                 }
+            )
+            EditorToolButton(
+                icon = Icons.Default.CheckCircle,
+                label = "StyLua",
+                onClick = { styleCheckResult = runStyluaStyleCheck(sourceText) }
             )
             Button(
                 onClick = {
@@ -173,6 +179,8 @@ fun VSCodeEditorScreen(
                 EditorMetric("Mode", if (isPath2DContext) "Path2D" else "Luau")
                 EditorMetric("Context", contextClassName?.name ?: "None")
 
+                StyleCheckPanel(styleCheckResult)
+
                 Text("SNIPPETS", color = Color(0xFF8C929C), fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
                 SnippetButton("example code") { sourceText = localScriptExampleCode(scriptName, contextClassName, className) }
                 SnippetButton("print") { sourceText += "\nprint(\"Hello from $scriptName\")" }
@@ -191,13 +199,13 @@ fun VSCodeEditorScreen(
 
                 Spacer(modifier = Modifier.weight(1f))
                 OutlinedButton(
-                    onClick = { sourceText = sourceText.trimEnd() + "\n" },
+                    onClick = { styleCheckResult = runStyluaStyleCheck(sourceText) },
                     modifier = Modifier.fillMaxWidth().height(40.dp),
                     border = BorderStroke(1.dp, Color(0xFF3D4148))
                 ) {
-                    Icon(Icons.Default.Code, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Format light", fontSize = 11.sp)
+                    Text("StyLua check", fontSize = 11.sp)
                 }
             }
 
@@ -325,6 +333,56 @@ private fun EditorMetric(label: String, value: String) {
     ) {
         Text(label, color = Color(0xFF8C929C), fontSize = 11.sp)
         Text(value, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun StyleCheckPanel(result: LuauStyleCheckResult?) {
+    if (result == null) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(34.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(Color(0xFF222631))
+                .padding(horizontal = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF5F6673), modifier = Modifier.size(15.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("StyLua check not run", color = Color(0xFF8C929C), fontSize = 10.sp)
+        }
+        return
+    }
+
+    val accent = if (result.ok) Color(0xFF28C840) else Color(0xFFFFBD2E)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFF222631), RoundedCornerShape(6.dp))
+            .border(1.dp, accent.copy(alpha = 0.55f), RoundedCornerShape(6.dp))
+            .padding(10.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(9.dp)
+                    .background(accent, CircleShape)
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(result.summary, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+        }
+        result.diagnostics.take(3).forEach { diagnostic ->
+            Text(
+                text = "L${diagnostic.line}: ${diagnostic.message}",
+                color = Color(0xFFC6CED8),
+                fontSize = 9.sp,
+                lineHeight = 12.sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
     }
 }
 

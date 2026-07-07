@@ -65,7 +65,8 @@ fun RobloxCanvasPreview(
     isPreviewMode: Boolean,
     useSingleDragMode: Boolean = false,
     onToggleDragMode: () -> Unit = {},
-    onOpenScrollMode: (String) -> Unit = {}
+    onOpenScrollMode: (String) -> Unit = {},
+    onOpenPathMode: (String) -> Unit = {}
 ) {
     Box(
         modifier = Modifier
@@ -99,7 +100,8 @@ fun RobloxCanvasPreview(
                 scaleFactor = scaleFactor,
                 useSingleDragMode = useSingleDragMode,
                 onToggleDragMode = onToggleDragMode,
-                onOpenScrollMode = onOpenScrollMode
+                onOpenScrollMode = onOpenScrollMode,
+                onOpenPathMode = onOpenPathMode
             )
         }
 
@@ -321,7 +323,8 @@ fun RenderRobloxObject(
     scaleFactor: Float,
     useSingleDragMode: Boolean = false,
     onToggleDragMode: () -> Unit = {},
-    onOpenScrollMode: (String) -> Unit = {}
+    onOpenScrollMode: (String) -> Unit = {},
+    onOpenPathMode: (String) -> Unit = {}
 ) {
     // Check basic structural values
     val isVisible = obj.properties["Visible"] as? Boolean ?: true
@@ -344,7 +347,8 @@ fun RenderRobloxObject(
                     scaleFactor = scaleFactor,
                     useSingleDragMode = useSingleDragMode,
                     onToggleDragMode = onToggleDragMode,
-                    onOpenScrollMode = onOpenScrollMode
+                    onOpenScrollMode = onOpenScrollMode,
+                    onOpenPathMode = onOpenPathMode
                 )
             }
         return
@@ -536,6 +540,9 @@ fun RenderRobloxObject(
                     onSelect(obj.id)
                     if (obj.className == RobloxClass.ScrollingFrame) {
                         onOpenScrollMode(obj.id)
+                    }
+                    if (obj.className == RobloxClass.Path2D) {
+                        onOpenPathMode(obj.id)
                     }
                 },
                 onDoubleClick = {
@@ -1001,7 +1008,8 @@ fun RenderRobloxObject(
                     scaleFactor = scaleFactor,
                     useSingleDragMode = useSingleDragMode,
                     onToggleDragMode = onToggleDragMode,
-                    onOpenScrollMode = onOpenScrollMode
+                    onOpenScrollMode = onOpenScrollMode,
+                    onOpenPathMode = onOpenPathMode
                 )
             }
         }

@@ -96,14 +96,25 @@ fun MainWorkspace(
     var propertiesMinimized by remember(isCompact) { mutableStateOf(false) }
     var showMainMenu by remember { mutableStateOf(true) }
     var activeScrollModeId by remember { mutableStateOf<String?>(null) }
+    var activePathModeId by remember { mutableStateOf<String?>(null) }
     val activeScrollObj = remember(rootObj, activeScrollModeId) {
         activeScrollModeId
             ?.let { viewModel.findObjectById(rootObj, it) }
             ?.takeIf { it.className == RobloxClass.ScrollingFrame }
     }
+    val activePathObj = remember(rootObj, activePathModeId) {
+        activePathModeId
+            ?.let { viewModel.findObjectById(rootObj, it) }
+            ?.takeIf { it.className == RobloxClass.Path2D }
+    }
     LaunchedEffect(activeScrollModeId, activeScrollObj) {
         if (activeScrollModeId != null && activeScrollObj == null) {
             activeScrollModeId = null
+        }
+    }
+    LaunchedEffect(activePathModeId, activePathObj) {
+        if (activePathModeId != null && activePathObj == null) {
+            activePathModeId = null
         }
     }
     val activeCanvasRoot = activeScrollObj ?: rootObj
@@ -188,6 +199,7 @@ fun MainWorkspace(
 	                onLoadProject = {
 	                    viewModel.loadProject(it)
 	                    activeScrollModeId = null
+	                    activePathModeId = null
 	                    showMainMenu = false
 	                }
 	            )
@@ -301,45 +313,70 @@ fun MainWorkspace(
 	                            accent = themeColors.accent
 	                        )
 	                        // Interactive background viewport
-	                        Box(
-                            modifier = Modifier
-                                .align(Alignment.Center)
-                                .graphicsLayer(
-                                    scaleX = canvasScale,
-                                    scaleY = canvasScale,
-                                    translationX = canvasOffsetX,
-                                    translationY = canvasOffsetY
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-	                            RobloxCanvasPreview(
-	                                root = activeCanvasRoot,
-	                                selectedId = selectedId,
-	                                onSelect = { viewModel.selectObject(it) },
-	                                onMoveOrResize = { id, pos, size -> viewModel.updateTransform(id, pos, size) },
-	                                screenWidth = activeCanvasWidth,
-	                                screenHeight = activeCanvasHeight,
-	                                scaleFactor = canvasScale,
-	                                showGrid = showGrid,
-	                                snapToGrid = snapToGrid,
-	                                gridSize = gridSize,
-	                                isPreviewMode = isPreviewMode,
-	                                useSingleDragMode = useSingleDragMode,
-	                                onToggleDragMode = { viewModel.setUseSingleDragMode(!useSingleDragMode) },
-	                                onOpenScrollMode = { id ->
-	                                    activeScrollModeId = id
-	                                    canvasScale = fitCanvasScale
-	                                    canvasOffsetX = 0f
-	                                    canvasOffsetY = 0f
-	                                }
+	                        if (!isPreviewMode && activePathObj != null) {
+	                            Path2DEditorWorkspace(
+	                                pathObj = activePathObj,
+	                                accent = themeColors.accent,
+	                                onUpdateProperty = { name, value ->
+	                                    viewModel.updateProperty(activePathObj.id, name, value)
+	                                },
+	                                onClose = { activePathModeId = null },
+	                                modifier = Modifier
+	                                    .fillMaxSize()
+	                                    .padding(start = 12.dp, top = 58.dp, end = 12.dp, bottom = 76.dp)
 	                            )
+	                        } else {
+	                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.Center)
+                                    .graphicsLayer(
+                                        scaleX = canvasScale,
+                                        scaleY = canvasScale,
+                                        translationX = canvasOffsetX,
+                                        translationY = canvasOffsetY
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+	                                RobloxCanvasPreview(
+	                                    root = activeCanvasRoot,
+	                                    selectedId = selectedId,
+	                                    onSelect = { viewModel.selectObject(it) },
+	                                    onMoveOrResize = { id, pos, size -> viewModel.updateTransform(id, pos, size) },
+	                                    screenWidth = activeCanvasWidth,
+	                                    screenHeight = activeCanvasHeight,
+	                                    scaleFactor = canvasScale,
+	                                    showGrid = showGrid,
+	                                    snapToGrid = snapToGrid,
+	                                    gridSize = gridSize,
+	                                    isPreviewMode = isPreviewMode,
+	                                    useSingleDragMode = useSingleDragMode,
+	                                    onToggleDragMode = { viewModel.setUseSingleDragMode(!useSingleDragMode) },
+	                                    onOpenScrollMode = { id ->
+	                                        activeScrollModeId = id
+	                                        activePathModeId = null
+	                                        canvasScale = fitCanvasScale
+	                                        canvasOffsetX = 0f
+	                                        canvasOffsetY = 0f
+	                                    },
+	                                    onOpenPathMode = { id ->
+	                                        activePathModeId = id
+	                                        activeScrollModeId = null
+	                                        viewModel.selectObject(id)
+	                                    }
+	                                )
+	                            }
 	                        }
 
 	                        CanvasModeTabs(
 	                            activeScrollObj = activeScrollObj,
+	                            activePathObj = activePathObj,
 	                            accent = themeColors.accent,
-	                            onRootMode = { activeScrollModeId = null },
+	                            onRootMode = {
+	                                activeScrollModeId = null
+	                                activePathModeId = null
+	                            },
 	                            onCloseScrollMode = { activeScrollModeId = null },
+	                            onClosePathMode = { activePathModeId = null },
 	                            modifier = Modifier
 	                                .align(Alignment.TopStart)
 	                                .padding(10.dp)
@@ -482,6 +519,11 @@ fun MainWorkspace(
                             onConvertScaleToOffset = { viewModel.convertScaleToOffset(it) },
                             onApplyAnchorPreset = { id, pr -> viewModel.applyAnchorPreset(id, pr) },
                             onOpenScript = { viewModel.openScriptEditor(it) },
+                            onOpenPathMode = { id ->
+                                activePathModeId = id
+                                activeScrollModeId = null
+                                viewModel.selectObject(id)
+                            },
                             lang = language,
                             onMinimize = { propertiesMinimized = true },
                             modifier = Modifier
@@ -496,7 +538,9 @@ fun MainWorkspace(
                 selectedObj = selectedObj,
                 projectName = projectName,
 	                canvasScale = canvasScale,
-	                canvasModeLabel = activeScrollObj?.let { "Scrolling: ${it.name}" } ?: "ScreenGui",
+	                canvasModeLabel = activePathObj?.let { "Path2D: ${it.name}" }
+	                    ?: activeScrollObj?.let { "Scrolling: ${it.name}" }
+	                    ?: "ScreenGui",
 	                showGrid = showGrid,
                 snapToGrid = snapToGrid
             )
@@ -518,6 +562,7 @@ fun MainWorkspace(
 	            onCreate = { name, temp ->
 	                viewModel.createNewProject(name, temp)
 	                activeScrollModeId = null
+	                activePathModeId = null
 	                showMainMenu = false
 	            }
 	        )
@@ -530,6 +575,7 @@ fun MainWorkspace(
 	            onLoadProject = {
 	                viewModel.loadProject(it)
 	                activeScrollModeId = null
+	                activePathModeId = null
 	                showMainMenu = false
 	            },
 	            onDeleteProject = { viewModel.deleteProject(it) }
@@ -554,6 +600,7 @@ fun MainWorkspace(
 	            gridSize = gridSize,
 	            uiScalePercent = uiScalePercent,
 	            studioTheme = studioTheme,
+	            language = language,
 	            arrowControlsEnabled = arrowControlsEnabled,
 	            arrowStepPx = arrowStepPx,
 	            onUseSingleDragModeChange = { viewModel.setUseSingleDragMode(it) },
@@ -563,6 +610,7 @@ fun MainWorkspace(
             onGridSizeChange = { viewModel.setGridSize(it) },
 	            onUiScalePercentChange = { viewModel.setUiScalePercent(it) },
 	            onThemeChange = { viewModel.setStudioTheme(it) },
+	            onLanguageChange = { viewModel.setLanguage(it) },
 	            onArrowControlsEnabledChange = { viewModel.setArrowControlsEnabled(it) },
 	            onArrowStepPxChange = { viewModel.setArrowStepPx(it) },
 	            onResetUi = {
@@ -781,9 +829,11 @@ private fun StudioTextureOverlay(
 @Composable
 private fun CanvasModeTabs(
     activeScrollObj: RobloxObject?,
+    activePathObj: RobloxObject?,
     accent: Color,
     onRootMode: () -> Unit,
     onCloseScrollMode: () -> Unit,
+    onClosePathMode: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -794,7 +844,12 @@ private fun CanvasModeTabs(
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        CanvasModeTab(label = "ScreenGui", selected = activeScrollObj == null, accent = accent, onClick = onRootMode)
+        CanvasModeTab(
+            label = "ScreenGui",
+            selected = activeScrollObj == null && activePathObj == null,
+            accent = accent,
+            onClick = onRootMode
+        )
         activeScrollObj?.let { scrollObj ->
             CanvasModeTab(
                 label = "Scrolling: ${scrollObj.name}",
@@ -804,6 +859,17 @@ private fun CanvasModeTabs(
             )
             IconButton(onClick = onCloseScrollMode, modifier = Modifier.size(30.dp)) {
                 Icon(Icons.Default.Close, contentDescription = "Close Scrolling Mode", tint = Color(0xFFC6CED8), modifier = Modifier.size(14.dp))
+            }
+        }
+        activePathObj?.let { pathObj ->
+            CanvasModeTab(
+                label = "Path2D: ${pathObj.name}",
+                selected = true,
+                accent = Color(0xFF8B5CF6),
+                onClick = {}
+            )
+            IconButton(onClick = onClosePathMode, modifier = Modifier.size(30.dp)) {
+                Icon(Icons.Default.Close, contentDescription = "Close Path2D Mode", tint = Color(0xFFC6CED8), modifier = Modifier.size(14.dp))
             }
         }
     }
@@ -1265,6 +1331,7 @@ private fun MacSettingsDialog(
 	    gridSize: Int,
 	    uiScalePercent: Int,
 	    studioTheme: String,
+	    language: String,
 	    arrowControlsEnabled: Boolean,
 	    arrowStepPx: Int,
 	    onUseSingleDragModeChange: (Boolean) -> Unit,
@@ -1274,6 +1341,7 @@ private fun MacSettingsDialog(
     onGridSizeChange: (Int) -> Unit,
 	    onUiScalePercentChange: (Int) -> Unit,
 	    onThemeChange: (String) -> Unit,
+	    onLanguageChange: (String) -> Unit,
 	    onArrowControlsEnabledChange: (Boolean) -> Unit,
 	    onArrowStepPxChange: (Int) -> Unit,
 	    onResetUi: () -> Unit,
@@ -1342,7 +1410,7 @@ private fun MacSettingsDialog(
                             .padding(8.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-	                        listOf("General", "Theme", "DPI", "Controls", "Grid", "Render", "Export").forEach { item ->
+	                        listOf("General", "Language", "Theme", "DPI", "Controls", "Grid", "Render", "Export").forEach { item ->
                             MacSettingsSidebarItem(
                                 label = item,
                                 selected = section == item,
@@ -1385,6 +1453,31 @@ private fun MacSettingsDialog(
                                         )
                                     }
                                 }
+                            }
+                            "Language" -> {
+                                SettingsInfoRow("Current language", if (language == "en") "English" else "Tiếng Việt")
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    LanguageChoiceCard(
+                                        label = "English",
+                                        subtitle = "Editor labels and export hints",
+                                        selected = language == "en",
+                                        accent = accent,
+                                        onClick = { onLanguageChange("en") },
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    LanguageChoiceCard(
+                                        label = "Tiếng Việt",
+                                        subtitle = "Giao diện và panel thuộc tính",
+                                        selected = language == "vi",
+                                        accent = accent,
+                                        onClick = { onLanguageChange("vi") },
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                                SettingsInfoRow("Saved locally", "Language preference is stored with app settings.")
                             }
                             "DPI" -> {
                                 SettingsInfoRow("UI scale", "Default 40%. Chỉnh % giao diện cho từng máy, tablet hoặc phone landscape.")
@@ -1564,6 +1657,38 @@ private fun ThemeChoiceChip(
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(label, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+    }
+}
+
+@Composable
+private fun LanguageChoiceCard(
+    label: String,
+    subtitle: String,
+    selected: Boolean,
+    accent: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .heightIn(min = 96.dp)
+            .background(if (selected) accent.copy(alpha = 0.16f) else Color(0xFF2B2D33), RoundedCornerShape(6.dp))
+            .border(1.dp, if (selected) accent.copy(alpha = 0.75f) else Color(0xFF3D4148), RoundedCornerShape(6.dp))
+            .clickable(onClick = onClick)
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(18.dp)
+                    .background(if (selected) accent else Color(0xFF3D4148), CircleShape)
+                    .border(1.dp, Color.White.copy(alpha = 0.45f), CircleShape)
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(label, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        }
+        Text(subtitle, color = Color(0xFFA6ACB3), fontSize = 11.sp, lineHeight = 14.sp)
     }
 }
 
