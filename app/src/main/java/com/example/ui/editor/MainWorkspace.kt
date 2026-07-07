@@ -92,8 +92,8 @@ fun MainWorkspace(
     var showCompactMenu by remember { mutableStateOf(false) }
     var generatedLuauCode by remember { mutableStateOf("") }
     var generatedRojoBundle by remember { mutableStateOf("") }
-    var explorerMinimized by remember(isCompact) { mutableStateOf(false) }
-    var propertiesMinimized by remember(isCompact) { mutableStateOf(false) }
+    var explorerMinimized by remember(isCompact) { mutableStateOf(isCompact) }
+    var propertiesMinimized by remember(isCompact) { mutableStateOf(isCompact) }
     var showMainMenu by remember { mutableStateOf(true) }
     var activeScrollModeId by remember { mutableStateOf<String?>(null) }
     var activePathModeId by remember { mutableStateOf<String?>(null) }
@@ -387,8 +387,7 @@ fun MainWorkspace(
                             modifier = Modifier
                                 .align(Alignment.TopEnd)
                                 .padding(8.dp)
-                                .background(Color(0xDD25272C), RoundedCornerShape(4.dp))
-                                .border(1.dp, Color(0xFF3D4148), RoundedCornerShape(4.dp))
+                                .liquidGlass(cornerRadius = 18.dp, tint = themeColors.accent, opacity = 0.16f)
                                 .padding(4.dp)
                         ) {
                             Row(
@@ -414,8 +413,7 @@ fun MainWorkspace(
                             modifier = Modifier
                                 .align(Alignment.BottomStart)
                                 .padding(12.dp)
-                                .background(Color(0xEE25272C), RoundedCornerShape(4.dp))
-                                .border(1.dp, Color(0xFF3D4148), RoundedCornerShape(4.dp))
+                                .liquidGlass(cornerRadius = 18.dp, tint = themeColors.accent, opacity = 0.14f)
                                 .padding(horizontal = 8.dp, vertical = 4.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
@@ -447,8 +445,7 @@ fun MainWorkspace(
                                 modifier = Modifier
                                     .align(Alignment.TopCenter)
                                     .padding(12.dp)
-                                    .background(Color(0xF225272C), RoundedCornerShape(4.dp))
-                                    .border(1.dp, Color(0xFF3D4148), RoundedCornerShape(4.dp))
+                                    .liquidGlass(cornerRadius = 18.dp, tint = themeColors.accent, opacity = 0.16f)
                                     .padding(horizontal = 4.dp, vertical = 4.dp),
                                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                                 verticalAlignment = Alignment.CenterVertically
@@ -688,8 +685,7 @@ private fun ProjectLauncherScreen(
                 modifier = Modifier
                     .weight(0.92f)
                     .fillMaxHeight()
-                    .background(Color(0xD9141820), RoundedCornerShape(8.dp))
-                    .border(1.dp, Color(0xFF2E3540), RoundedCornerShape(8.dp))
+                    .liquidGlass(cornerRadius = 24.dp, tint = themeColors.accent, opacity = 0.13f)
                     .padding(18.dp),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
@@ -740,8 +736,7 @@ private fun ProjectLauncherScreen(
                 modifier = Modifier
                     .weight(1.38f)
                     .fillMaxHeight()
-                    .background(Color(0xD91A2029), RoundedCornerShape(8.dp))
-                    .border(1.dp, Color(0xFF303743), RoundedCornerShape(8.dp))
+                    .liquidGlass(cornerRadius = 24.dp, tint = themeColors.accent, opacity = 0.11f)
                     .padding(14.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
@@ -766,8 +761,7 @@ private fun ProjectLauncherScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(54.dp)
-                                    .background(Color(0xFF11151B), RoundedCornerShape(6.dp))
-                                    .border(1.dp, Color(0xFF2E3540), RoundedCornerShape(6.dp))
+                                    .liquidGlass(cornerRadius = 14.dp, tint = themeColors.accent, opacity = 0.09f, strokeOpacity = 0.18f)
                                     .clickable { onLoadProject(project) }
                                     .padding(horizontal = 10.dp),
                                 verticalAlignment = Alignment.CenterVertically,
@@ -796,9 +790,35 @@ private fun StudioTextureOverlay(
     androidx.compose.foundation.Canvas(modifier = modifier) {
         drawRect(
             brush = Brush.linearGradient(
-                colors = listOf(Color(0xFF151922), Color(0xFF101319)),
+                colors = listOf(
+                    Color(0xFF08111F),
+                    Color(0xFF141827),
+                    Color(0xFF232044),
+                    Color(0xFF11131A)
+                ),
                 start = Offset.Zero,
                 end = Offset(size.width, size.height)
+            )
+        )
+        drawRect(
+            brush = Brush.radialGradient(
+                colors = listOf(accent.copy(alpha = 0.18f), Color.Transparent),
+                center = Offset(size.width * 0.14f, size.height * 0.08f),
+                radius = size.minDimension * 0.92f
+            )
+        )
+        drawRect(
+            brush = Brush.radialGradient(
+                colors = listOf(Color(0xFFFF7AAE).copy(alpha = 0.11f), Color.Transparent),
+                center = Offset(size.width * 0.86f, size.height * 0.16f),
+                radius = size.minDimension * 0.82f
+            )
+        )
+        drawRect(
+            brush = Brush.radialGradient(
+                colors = listOf(Color(0xFF7DD3FC).copy(alpha = 0.10f), Color.Transparent),
+                center = Offset(size.width * 0.72f, size.height * 0.90f),
+                radius = size.minDimension * 0.80f
             )
         )
         val lineColor = accent.copy(alpha = 0.045f)
@@ -838,8 +858,7 @@ private fun CanvasModeTabs(
 ) {
     Row(
         modifier = modifier
-            .background(Color(0xEE171C23), RoundedCornerShape(6.dp))
-            .border(1.dp, Color(0xFF303743), RoundedCornerShape(6.dp))
+            .liquidGlass(cornerRadius = 18.dp, tint = accent, opacity = 0.16f)
             .padding(4.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -910,8 +929,7 @@ private fun TransformNudgePad(
     Column(
         modifier = modifier
             .width(178.dp)
-            .background(Color(0xF0181C23), RoundedCornerShape(6.dp))
-            .border(1.dp, Color(0xFF303743), RoundedCornerShape(6.dp))
+            .liquidGlass(cornerRadius = 18.dp, tint = accent, opacity = 0.14f)
             .padding(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
@@ -1017,18 +1035,14 @@ private fun StudioTopBar(
     onLoadProject: (ProjectEntity) -> Unit
 ) {
     Surface(
-        color = Color(0xFF111419),
-        border = BorderStroke(0.5.dp, Color(0xFF252B34))
+        color = Color.Transparent
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(if (isCompact) 48.dp else 52.dp)
-                .background(
-                    Brush.horizontalGradient(
-                        listOf(Color(0xFF111419), themeColors.topBar.copy(alpha = 0.82f), Color(0xFF111419))
-                    )
-                )
+                .padding(horizontal = 6.dp, vertical = 4.dp)
+                .height(if (isCompact) 44.dp else 48.dp)
+                .liquidGlass(cornerRadius = 22.dp, tint = themeColors.accent, opacity = 0.12f)
                 .padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -1703,8 +1717,8 @@ private fun StudioSidebarRail(
     Column(
         modifier = modifier
             .fillMaxHeight()
-            .background(Color(0xFF25272C))
-            .border(1.dp, Color(0xFF3D4148))
+            .padding(4.dp)
+            .liquidGlass(cornerRadius = 18.dp, tint = Color(0xFF8FBFF8), opacity = 0.12f, strokeOpacity = 0.22f)
             .padding(vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp)

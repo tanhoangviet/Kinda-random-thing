@@ -9,6 +9,7 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -42,10 +43,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -78,27 +81,55 @@ fun Path2DEditorWorkspace(
 ) {
     val pointsString = pathObj.properties["ControlPoints"] as? String
         ?: "0.000,0.800;0.260,0.240;0.580,0.660;1.000,0.180"
-    val points = remember(pointsString) { parsePath2DEditorPoints(pointsString) }
+    var editorPoints by remember(pathObj.id) { mutableStateOf(parsePath2DEditorPoints(pointsString)) }
+    var rawPointsText by remember(pathObj.id) { mutableStateOf(pointsString) }
+    var lastProjectPoints by remember(pathObj.id) { mutableStateOf(pointsString) }
     val closed = pathObj.properties["Closed"] as? Boolean ?: false
     val thickness = (pathObj.properties["Thickness"] as? Int ?: 4).coerceIn(1, 32)
     val colorRaw = pathObj.properties["Color3"] as? Color3 ?: Color3(0, 162, 255)
     val pathColor = Color(colorRaw.r, colorRaw.g, colorRaw.b)
     var selectedIndex by remember(pathObj.id) { mutableIntStateOf(0) }
     var draggingIndex by remember(pathObj.id) { mutableStateOf<Int?>(null) }
-    val safeIndex = selectedIndex.coerceIn(0, (points.size - 1).coerceAtLeast(0))
-    val selectedPoint = points.getOrNull(safeIndex)
+    val currentEditorPoints by rememberUpdatedState(editorPoints)
+    val safeIndex = selectedIndex.coerceIn(0, (editorPoints.size - 1).coerceAtLeast(0))
+    val selectedPoint = editorPoints.getOrNull(safeIndex)
 
-    fun commitPoints(next: List<Vector2>) {
-        onUpdateProperty("ControlPoints", serializePath2DEditorPoints(next.take(80)))
+    LaunchedEffect(pathObj.id, pointsString) {
+        if (pointsString != lastProjectPoints && draggingIndex == null) {
+            editorPoints = parsePath2DEditorPoints(pointsString)
+            rawPointsText = pointsString
+            lastProjectPoints = pointsString
+            selectedIndex = selectedIndex.coerceIn(0, (editorPoints.size - 1).coerceAtLeast(0))
+        }
     }
 
-    Row(
+    fun updateDraft(next: List<Vector2>) {
+        editorPoints = next.take(80)
+        rawPointsText = serializePath2DEditorPoints(editorPoints)
+        selectedIndex = selectedIndex.coerceIn(0, (editorPoints.size - 1).coerceAtLeast(0))
+    }
+
+    fun commitPoints(next: List<Vector2>) {
+        val safe = next.take(80).takeIf { it.size >= 2 } ?: parsePath2DEditorPoints(pointsString)
+        val serialized = serializePath2DEditorPoints(safe)
+        editorPoints = safe
+        rawPointsText = serialized
+        lastProjectPoints = serialized
+        selectedIndex = selectedIndex.coerceIn(0, (safe.size - 1).coerceAtLeast(0))
+        onUpdateProperty("ControlPoints", serialized)
+    }
+
+    BoxWithConstraints(
         modifier = modifier
-            .background(Color(0xE611151B), RoundedCornerShape(8.dp))
-            .border(1.dp, Color(0xFF303743), RoundedCornerShape(8.dp))
-            .padding(8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+            .liquidGlass(cornerRadius = 24.dp, tint = accent, opacity = 0.14f)
     ) {
+        val compactEditor = maxWidth < 760.dp
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -108,7 +139,7 @@ fun Path2DEditorWorkspace(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(44.dp)
+                    .height(48.dp)
                     .background(Color(0xFF1A2029), RoundedCornerShape(6.dp))
                     .border(1.dp, Color(0xFF303743), RoundedCornerShape(6.dp))
                     .padding(horizontal = 12.dp),
@@ -124,7 +155,7 @@ fun Path2DEditorWorkspace(
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        text = "${points.size} keys  |  ${if (closed) "Closed" else "Open"}  |  ${thickness}px",
+                        text = "${editorPoints.size} keys  |  ${if (closed) "Closed" else "Open"}  |  ${thickness}px",
                         color = Color(0xFF8E96A3),
                         fontSize = 9.sp,
                         maxLines = 1
@@ -147,8 +178,9 @@ fun Path2DEditorWorkspace(
                 Canvas(
                     modifier = Modifier
                         .fillMaxSize()
-                        .pointerInput(pointsString) {
+                        .pointerInput(pathObj.id) {
                             detectTapGestures { tap ->
+                                val points = currentEditorPoints
                                 val nearest = nearestPath2DEditorPoint(points, tap, size.width.toFloat(), size.height.toFloat())
                                 if (nearest != null) {
                                     selectedIndex = nearest
@@ -162,23 +194,33 @@ fun Path2DEditorWorkspace(
                                 commitPoints(inserted)
                             }
                         }
-                        .pointerInput(pointsString) {
+                        .pointerInput(pathObj.id) {
+                            var workingPoints = currentEditorPoints
                             detectDragGestures(
                                 onDragStart = { start ->
-                                    draggingIndex = nearestPath2DEditorPoint(points, start, size.width.toFloat(), size.height.toFloat())
+                                    workingPoints = currentEditorPoints
+                                    draggingIndex = nearestPath2DEditorPoint(workingPoints, start, size.width.toFloat(), size.height.toFloat())
                                     draggingIndex?.let { selectedIndex = it }
                                 },
-                                onDragEnd = { draggingIndex = null },
-                                onDragCancel = { draggingIndex = null },
+                                onDragEnd = {
+                                    val finalPoints = workingPoints
+                                    draggingIndex = null
+                                    commitPoints(finalPoints)
+                                },
+                                onDragCancel = {
+                                    draggingIndex = null
+                                    updateDraft(currentEditorPoints)
+                                },
                                 onDrag = { change, _ ->
                                     val index = draggingIndex ?: return@detectDragGestures
                                     change.consume()
-                                    val updated = points.toMutableList()
+                                    val updated = workingPoints.toMutableList()
                                     updated[index] = Vector2(
                                         x = (change.position.x / size.width.toFloat()).coerceIn(0f, 1f),
                                         y = (change.position.y / size.height.toFloat()).coerceIn(0f, 1f)
                                     )
-                                    commitPoints(updated)
+                                    workingPoints = updated
+                                    updateDraft(updated)
                                 }
                             )
                         }
@@ -222,10 +264,10 @@ fun Path2DEditorWorkspace(
                     drawLine(axis, Offset(size.width / 2f, 0f), Offset(size.width / 2f, size.height), 1.dp.toPx())
                     drawLine(axis, Offset(0f, size.height / 2f), Offset(size.width, size.height / 2f), 1.dp.toPx())
 
-                    if (points.size >= 2) {
+                    if (editorPoints.size >= 2) {
                         val path = Path().apply {
-                            moveTo(points.first().x * size.width, points.first().y * size.height)
-                            points.drop(1).forEach { point ->
+                            moveTo(editorPoints.first().x * size.width, editorPoints.first().y * size.height)
+                            editorPoints.drop(1).forEach { point ->
                                 lineTo(point.x * size.width, point.y * size.height)
                             }
                             if (closed) close()
@@ -242,7 +284,7 @@ fun Path2DEditorWorkspace(
                         )
                     }
 
-                    points.forEachIndexed { index, point ->
+                    editorPoints.forEachIndexed { index, point ->
                         val center = Offset(point.x * size.width, point.y * size.height)
                         val selected = index == safeIndex
                         drawCircle(
@@ -284,10 +326,12 @@ fun Path2DEditorWorkspace(
 
         Column(
             modifier = Modifier
-                .widthIn(min = 220.dp, max = 276.dp)
+                .widthIn(
+                    min = if (compactEditor) 176.dp else 220.dp,
+                    max = if (compactEditor) 224.dp else 276.dp
+                )
                 .fillMaxHeight()
-                .background(Color(0xFF151A22), RoundedCornerShape(8.dp))
-                .border(1.dp, Color(0xFF303743), RoundedCornerShape(8.dp))
+                .liquidGlass(cornerRadius = 18.dp, tint = accent, opacity = 0.12f)
                 .padding(10.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
@@ -299,15 +343,15 @@ fun Path2DEditorWorkspace(
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
                 Button(
                     onClick = {
-                        val insertAt = (safeIndex + 1).coerceIn(1, points.size)
-                        val current = points.getOrNull(safeIndex) ?: Vector2(0.5f, 0.5f)
-                        val next = points.getOrNull(insertAt) ?: Vector2((current.x + 0.12f).coerceIn(0f, 1f), current.y)
+                        val insertAt = (safeIndex + 1).coerceIn(1, editorPoints.size)
+                        val current = editorPoints.getOrNull(safeIndex) ?: Vector2(0.5f, 0.5f)
+                        val next = editorPoints.getOrNull(insertAt) ?: Vector2((current.x + 0.12f).coerceIn(0f, 1f), current.y)
                         val midpoint = Vector2((current.x + next.x) / 2f, (current.y + next.y) / 2f)
                         selectedIndex = insertAt
-                        commitPoints(points.toMutableList().apply { add(insertAt, midpoint) })
+                        commitPoints(editorPoints.toMutableList().apply { add(insertAt, midpoint) })
                     },
                     contentPadding = PaddingValues(horizontal = 8.dp),
-                    modifier = Modifier.weight(1f).height(40.dp),
+                    modifier = Modifier.weight(1f).height(44.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = accent, contentColor = Color.White)
                 ) {
                     Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(15.dp))
@@ -316,13 +360,13 @@ fun Path2DEditorWorkspace(
                 }
                 OutlinedButton(
                     onClick = {
-                        if (points.size > 2) {
+                        if (editorPoints.size > 2) {
                             selectedIndex = (safeIndex - 1).coerceAtLeast(0)
-                            commitPoints(points.toMutableList().apply { removeAt(safeIndex) })
+                            commitPoints(editorPoints.toMutableList().apply { removeAt(safeIndex) })
                         }
                     },
                     contentPadding = PaddingValues(horizontal = 8.dp),
-                    modifier = Modifier.weight(1f).height(40.dp),
+                    modifier = Modifier.weight(1f).height(44.dp),
                     border = BorderStroke(1.dp, Color(0xFF3D4148))
                 ) {
                     Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(15.dp))
@@ -334,11 +378,11 @@ fun Path2DEditorWorkspace(
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
                 OutlinedButton(
                     onClick = {
-                        selectedIndex = (points.lastIndex - safeIndex).coerceAtLeast(0)
-                        commitPoints(points.reversed())
+                        selectedIndex = (editorPoints.lastIndex - safeIndex).coerceAtLeast(0)
+                        commitPoints(editorPoints.reversed())
                     },
                     contentPadding = PaddingValues(horizontal = 8.dp),
-                    modifier = Modifier.weight(1f).height(40.dp),
+                    modifier = Modifier.weight(1f).height(44.dp),
                     border = BorderStroke(1.dp, Color(0xFF3D4148))
                 ) {
                     Icon(Icons.Default.Flip, contentDescription = null, modifier = Modifier.size(15.dp))
@@ -351,7 +395,7 @@ fun Path2DEditorWorkspace(
                         commitPoints(listOf(Vector2(0f, 0.8f), Vector2(0.26f, 0.24f), Vector2(0.58f, 0.66f), Vector2(1f, 0.18f)))
                     },
                     contentPadding = PaddingValues(horizontal = 8.dp),
-                    modifier = Modifier.weight(1f).height(40.dp),
+                    modifier = Modifier.weight(1f).height(44.dp),
                     border = BorderStroke(1.dp, Color(0xFF3D4148))
                 ) {
                     Text("Reset", fontSize = 11.sp)
@@ -404,20 +448,22 @@ fun Path2DEditorWorkspace(
                         value = point.x,
                         accent = accent,
                         onValueChange = { nextX ->
-                            val updated = points.toMutableList()
+                            val updated = editorPoints.toMutableList()
                             updated[safeIndex] = point.copy(x = nextX)
-                            commitPoints(updated)
-                        }
+                            updateDraft(updated)
+                        },
+                        onValueChangeFinished = { commitPoints(editorPoints) }
                     )
                     PathPointSlider(
                         label = "Y",
                         value = point.y,
                         accent = accent,
                         onValueChange = { nextY ->
-                            val updated = points.toMutableList()
+                            val updated = editorPoints.toMutableList()
                             updated[safeIndex] = point.copy(y = nextY)
-                            commitPoints(updated)
-                        }
+                            updateDraft(updated)
+                        },
+                        onValueChangeFinished = { commitPoints(editorPoints) }
                     )
                 }
             }
@@ -429,7 +475,7 @@ fun Path2DEditorWorkspace(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                points.forEachIndexed { index, point ->
+                editorPoints.forEachIndexed { index, point ->
                     PathPointRow(
                         index = index,
                         point = point,
@@ -441,12 +487,27 @@ fun Path2DEditorWorkspace(
             }
 
             RobloxTextField(
-                value = pointsString,
-                onValueChange = { onUpdateProperty("ControlPoints", it) },
-                modifier = Modifier.fillMaxWidth().height(40.dp),
+                value = rawPointsText,
+                onValueChange = { raw ->
+                    rawPointsText = raw
+                    val parsed = parsePath2DEditorPoints(raw)
+                    if (parsed.size >= 2) {
+                        editorPoints = parsed
+                    }
+                },
+                modifier = Modifier.fillMaxWidth().height(44.dp),
                 placeholder = "0.0,0.0;1.0,1.0"
             )
+            Button(
+                onClick = { commitPoints(parsePath2DEditorPoints(rawPointsText)) },
+                modifier = Modifier.fillMaxWidth().height(44.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = accent, contentColor = Color.White),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp)
+            ) {
+                Text("Apply Points", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            }
         }
+    }
     }
 }
 
@@ -455,7 +516,8 @@ private fun PathPointSlider(
     label: String,
     value: Float,
     accent: Color,
-    onValueChange: (Float) -> Unit
+    onValueChange: (Float) -> Unit,
+    onValueChangeFinished: () -> Unit = {}
 ) {
     Column {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -465,6 +527,7 @@ private fun PathPointSlider(
         Slider(
             value = value.coerceIn(0f, 1f),
             onValueChange = { onValueChange(it.coerceIn(0f, 1f)) },
+            onValueChangeFinished = onValueChangeFinished,
             valueRange = 0f..1f,
             colors = SliderDefaults.colors(thumbColor = accent, activeTrackColor = accent),
             modifier = Modifier.height(28.dp)
@@ -483,7 +546,7 @@ private fun PathPointRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(38.dp)
+            .height(44.dp)
             .clip(RoundedCornerShape(6.dp))
             .background(if (selected) accent.copy(alpha = 0.18f) else Color(0xFF1D232D))
             .border(1.dp, if (selected) accent.copy(alpha = 0.55f) else Color(0xFF2E3540), RoundedCornerShape(6.dp))
