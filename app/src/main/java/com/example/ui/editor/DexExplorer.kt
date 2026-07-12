@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -70,6 +71,7 @@ fun DexExplorerPanel(
     Column(
         modifier = modifier
             .background(Color(0xFF1B2028))
+            .liquidGlass(cornerRadius = 18.dp, tint = Color(0xFF8FBFF8), opacity = 0.08f)
             .border(1.dp, Color(0xFF303743))
             .padding(8.dp)
     ) {
@@ -552,7 +554,7 @@ fun RenderExplorerNode(
                         text = { Text("Open Script", fontSize = 11.sp) },
                         onClick = { onOpenScript(node.id); showContextMenu = false }
                     )
-                    Divider()
+                    HorizontalDivider()
                 }
                 DropdownMenuItem(
                     leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(14.dp)) },
@@ -574,7 +576,7 @@ fun RenderExplorerNode(
                     text = { Text("Duplicate", fontSize = 11.sp) },
                     onClick = { onDuplicate(node.id); showContextMenu = false }
                 )
-                Divider()
+                HorizontalDivider()
                 DropdownMenuItem(
                     leadingIcon = { Icon(Icons.Default.ArrowUpward, contentDescription = null, modifier = Modifier.size(14.dp)) },
                     text = { Text("Move Up", fontSize = 11.sp) },
@@ -585,7 +587,7 @@ fun RenderExplorerNode(
                     text = { Text("Move Down", fontSize = 11.sp) },
                     onClick = { onMove(node.id, false); showContextMenu = false }
                 )
-                Divider()
+                HorizontalDivider()
                 DropdownMenuItem(
                     leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.Red) },
                     text = { Text("Delete", fontSize = 11.sp, color = Color.Red) },

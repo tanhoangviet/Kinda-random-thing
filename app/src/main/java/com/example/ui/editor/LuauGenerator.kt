@@ -24,7 +24,7 @@ object LuauGenerator {
         sb.append("\n")
         sb.append("    ----------------------------------------\n")
         sb.append("    - Strict Luau, StyLua-friendly formatting, and Darklua-ready output.\n")
-        sb.append("    - GUI coordinates are normalized to scale so the UI fits every Roblox viewport.\n")
+        sb.append("    - GUI coordinates keep their scale and offset so exports stay DPI-safe.\n")
         sb.append("]]\n\n")
         if (includeMountCode) {
             sb.append("local Players = game:GetService(\"Players\")\n")
@@ -64,8 +64,7 @@ object LuauGenerator {
             parentKey: String?,
             parentW: Float,
             parentH: Float,
-            depth: Int,
-            siblingIndex: Int
+            depth: Int
         ) {
             val key = getObjectKey(obj)
             val objectBounds = resolveObjectExportBounds(obj, parentW, parentH)
@@ -82,8 +81,6 @@ object LuauGenerator {
             obj.properties.forEach { (name, value) ->
                 val exportName = normalizeExportPropertyName(obj.className, name)
                 if (isPropertyRelevant(obj.className, exportName)) {
-                    val propertyParentW = if (exportName == "CanvasSize") objectBounds.first else parentW
-                    val propertyParentH = if (exportName == "CanvasSize") objectBounds.second else parentH
                     if (obj.className in listOf(RobloxClass.ImageLabel, RobloxClass.ImageButton) && exportName == "Image" && value is String) {
                         val customAssetCode = formatCustomImageAssetAssignment(key, value)
                         if (customAssetCode != null) {
@@ -98,10 +95,7 @@ object LuauGenerator {
                     val formatted = formatPropertyValue(
                         className = obj.className,
                         propName = exportName,
-                        value = value,
-                        parentW = propertyParentW,
-                        parentH = propertyParentH,
-                        siblingIndex = siblingIndex
+                        value = value
                     )
                     if (formatted != null) {
                         sb.append("GUI[\"$key\"][\"$exportName\"] = $formatted\n")
@@ -129,8 +123,7 @@ object LuauGenerator {
                     parentKey = key,
                     parentW = objectBounds.first,
                     parentH = objectBounds.second,
-                    depth = depth + 1,
-                    siblingIndex = index
+                    depth = depth + 1
                 )
             }
         }
@@ -140,8 +133,7 @@ object LuauGenerator {
             parentKey = null,
             parentW = canvasWidth.coerceAtLeast(1).toFloat(),
             parentH = canvasHeight.coerceAtLeast(1).toFloat(),
-            depth = 0,
-            siblingIndex = 0
+            depth = 0
         )
         
         sb.append("return GUI\n")
@@ -277,10 +269,7 @@ object LuauGenerator {
     private fun formatPropertyValue(
         className: RobloxClass,
         propName: String,
-        value: Any,
-        parentW: Float,
-        parentH: Float,
-        siblingIndex: Int
+        value: Any
     ): String? {
         if (className == RobloxClass.UIGradient && propName == "Color" && value is String) {
             return formatGradientColor(value)
@@ -295,10 +284,10 @@ object LuauGenerator {
             return formatUDim(propName, value)
         }
         if (shouldNormalizeScaleProperty(className, propName) && value is UDim2) {
-            return formatScaleUDim2(value, parentW, parentH)
+            return formatExportUDim2(value)
         }
         if (propName == "ZIndex" && value is Int) {
-            return normalizeZIndex(value, siblingIndex).toString()
+            return value.toString()
         }
         
         val enumProperties = mapOf(
@@ -327,7 +316,7 @@ object LuauGenerator {
             is Float -> value.toLuauNumber()
             is Double -> value.toLuauNumber()
             is String -> formatLuauString(value, multiline = propName == "Source")
-            is UDim2 -> "UDim2.new(${value.scaleX.toLuauNumber()}, ${value.offsetX}, ${value.scaleY.toLuauNumber()}, ${value.offsetY})"
+            is UDim2 -> formatExportUDim2(value)
             is Vector2 -> "Vector2.new(${value.x}, ${value.y})"
             is Color3 -> "Color3.fromRGB(${value.r}, ${value.g}, ${value.b})"
             else -> null
@@ -353,15 +342,16 @@ object LuauGenerator {
         )
     }
 
-    private fun formatScaleUDim2(value: UDim2, parentW: Float, parentH: Float): String {
-        val scaleX = (value.scaleX + value.offsetX / parentW.coerceAtLeast(1f)).coerceIn(-10f, 10f)
-        val scaleY = (value.scaleY + value.offsetY / parentH.coerceAtLeast(1f)).coerceIn(-10f, 10f)
-        return "UDim2.new(${scaleX.toLuauNumber()}, 0, ${scaleY.toLuauNumber()}, 0)"
-    }
-
-    private fun normalizeZIndex(value: Int, siblingIndex: Int): Int {
-        val stableDefault = 1 + siblingIndex
-        return maxOf(value, stableDefault).coerceIn(1, 10000)
+    private fun formatExportUDim2(value: UDim2): String {
+        val scaleX = value.scaleX
+        val scaleY = value.scaleY
+        val offsetX = value.offsetX
+        val offsetY = value.offsetY
+        return when {
+            offsetX == 0 && offsetY == 0 -> "UDim2.fromScale(${scaleX.toLuauNumber()}, ${scaleY.toLuauNumber()})"
+            scaleX == 0f && scaleY == 0f -> "UDim2.fromOffset($offsetX, $offsetY)"
+            else -> "UDim2.new(${scaleX.toLuauNumber()}, $offsetX, ${scaleY.toLuauNumber()}, $offsetY)"
+        }
     }
 
     private fun formatCustomImageAssetAssignment(key: String, image: String): String? {

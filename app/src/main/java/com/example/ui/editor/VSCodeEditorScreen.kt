@@ -13,7 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.CheckCircle
@@ -61,8 +61,8 @@ fun VSCodeEditorScreen(
     val isPath2DContext = className == RobloxClass.LocalScript && contextClassName == RobloxClass.Path2D
     val configuration = LocalConfiguration.current
     val isCompact = configuration.screenWidthDp < 900 || configuration.screenHeightDp < 520
-    val sidebarWidth = if (isCompact) 168.dp else 224.dp
-    val editorMinWidth = if (isCompact) 560.dp else 900.dp
+    val sidebarWidth = if (isCompact) 152.dp else 224.dp
+    val editorMinWidth = if (isCompact) 360.dp else 900.dp
 
     Column(
         modifier = Modifier
@@ -137,7 +137,7 @@ fun VSCodeEditorScreen(
                 Text("Save", fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
             IconButton(onClick = onBack, modifier = Modifier.size(44.dp)) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color(0xFFE7EAEE))
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color(0xFFE7EAEE))
             }
         }
 

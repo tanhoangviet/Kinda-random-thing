@@ -54,6 +54,7 @@ fun PropertiesPanel(
         Box(
             modifier = modifier
                 .background(Color(0xFF1B2028))
+                .liquidGlass(cornerRadius = 18.dp, tint = Color(0xFF8FBFF8), opacity = 0.08f)
                 .border(1.dp, Color(0xFF303743))
                 .padding(16.dp),
             contentAlignment = Alignment.Center
@@ -90,6 +91,7 @@ fun PropertiesPanel(
     Column(
         modifier = modifier
             .background(Color(0xFF1B2028))
+            .liquidGlass(cornerRadius = 18.dp, tint = Color(0xFF8FBFF8), opacity = 0.08f)
             .border(1.dp, Color(0xFF303743))
             .verticalScroll(scrollState)
             .padding(8.dp)
@@ -513,27 +515,30 @@ fun PropertiesPanel(
                 }
 
                 val points = selectedObj.properties["ControlPoints"] as? String ?: "0.00,0.80;0.26,0.24;0.58,0.66;1.00,0.18"
-                Button(
-                    onClick = { onOpenPathMode(selectedObj.id) },
+                val pointCount = parsePath2DPropertyPoints(points).size
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(40.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8B5CF6), contentColor = Color.White),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp)
+                        .height(42.dp)
+                        .background(Color(0xFF121720), RoundedCornerShape(6.dp))
+                        .border(1.dp, Color(0xFF303743), RoundedCornerShape(6.dp))
+                        .padding(horizontal = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Open Path2D Tab", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                }
-
-                PropertyRow(label = "Points") {
-                    RobloxTextField(
-                        value = points,
-                        onValueChange = { onUpdateProperty(selectedObj.id, "ControlPoints", it) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(30.dp)
-                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Path data", color = Color(0xFFE7EAEE), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                        Text("$pointCount keys, edited in Path2D tab", color = Color(0xFF8E96A3), fontSize = 9.sp, maxLines = 1)
+                    }
+                    Button(
+                        onClick = { onOpenPathMode(selectedObj.id) },
+                        modifier = Modifier.height(30.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8B5CF6), contentColor = Color.White),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp)
+                    ) {
+                        Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(15.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Open tab", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
@@ -557,10 +562,10 @@ fun PropertiesPanel(
                 PropertyRow(label = "Text Color") {
                     Box(
                         modifier = Modifier
-                            .size(34.dp, 22.dp)
-                            .clip(RoundedCornerShape(4.dp))
+                            .size(38.dp)
+                            .clip(CircleShape)
                             .background(Color(textCol.r, textCol.g, textCol.b))
-                            .border(1.dp, Color.Gray, RoundedCornerShape(4.dp))
+                            .border(1.dp, Color.White.copy(alpha = 0.45f), CircleShape)
                             .clickable { activeColorProp = Pair("TextColor3", textCol) }
                     )
                 }
@@ -1306,7 +1311,7 @@ fun StudioDropdownField(
 @Composable
 fun UDim2Editor(label: String, udim2: UDim2, onValueChange: (UDim2) -> Unit) {
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
-        Text(text = label, color = Color.Gray, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+        Text(text = label, color = Color(0xFFCBD3DD), fontSize = 10.sp, fontWeight = FontWeight.Bold)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -1356,7 +1361,7 @@ fun UDim2Editor(label: String, udim2: UDim2, onValueChange: (UDim2) -> Unit) {
 @Composable
 fun Vector2Editor(label: String, vector2: Vector2, onValueChange: (Vector2) -> Unit) {
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
-        Text(text = label, color = Color.Gray, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+        Text(text = label, color = Color(0xFFCBD3DD), fontSize = 10.sp, fontWeight = FontWeight.Bold)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -1393,7 +1398,7 @@ fun CoordinateInputBox(label: String, value: String, onValueChange: (String) -> 
             textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 11.sp, textAlign = TextAlign.Center),
             modifier = Modifier
                 .fillMaxWidth()
-                .height(42.dp),
+                .height(46.dp),
             cursorBrush = SolidColor(Color(0, 162, 255)),
             decorationBox = { innerTextField ->
                 Column(
@@ -1401,13 +1406,14 @@ fun CoordinateInputBox(label: String, value: String, onValueChange: (String) -> 
                         .fillMaxSize()
                         .background(Color(0xFF171A1F), RoundedCornerShape(4.dp))
                         .border(1.dp, Color(0xFF404650), RoundedCornerShape(4.dp))
-                        .padding(horizontal = 4.dp, vertical = 3.dp),
+                        .padding(horizontal = 6.dp, vertical = 4.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
                         label,
-                        fontSize = 7.sp,
-                        color = Color(0xFF7F8792),
+                        fontSize = 8.sp,
+                        color = Color(0xFF9CA5B3),
+                        fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth()
@@ -1529,9 +1535,9 @@ fun ColorPickerDialog(
                                 modifier = Modifier
                                     .weight(1f)
                                     .aspectRatio(1f)
-                                    .clip(RoundedCornerShape(4.dp))
+                                    .clip(CircleShape)
                                     .background(Color(preset.r, preset.g, preset.b))
-                                    .border(1.dp, Color.White.copy(alpha = 0.35f), RoundedCornerShape(4.dp))
+                                    .border(1.dp, Color.White.copy(alpha = 0.35f), CircleShape)
                                     .clickable {
                                         r = preset.r
                                         g = preset.g

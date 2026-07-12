@@ -10,11 +10,14 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -39,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
 import com.example.data.local.ProjectEntity
 import com.example.data.model.RobloxClass
@@ -56,30 +60,30 @@ fun MainWorkspace(
     val isCompact = configuration.screenWidthDp < 900 || configuration.screenHeightDp < 520
 
     // ViewModel Observables
-    val rootObj by viewModel.rootObject.collectAsState()
-    val selectedId by viewModel.selectedObjectId.collectAsState()
-    val selectedObj by viewModel.selectedObject.collectAsState()
+    val rootObj by viewModel.rootObject.collectAsStateWithLifecycle()
+    val selectedId by viewModel.selectedObjectId.collectAsStateWithLifecycle()
+    val selectedObj by viewModel.selectedObject.collectAsStateWithLifecycle()
 
-    val projectName by viewModel.currentProjectName.collectAsState()
-    val isPreviewMode by viewModel.isPreviewMode.collectAsState()
-    val showGrid by viewModel.showGrid.collectAsState()
-    val snapToGrid by viewModel.snapToGrid.collectAsState()
-    val gridSize by viewModel.gridSize.collectAsState()
-    val screenWidth by viewModel.screenWidth.collectAsState()
-    val screenHeight by viewModel.screenHeight.collectAsState()
-    val savedProjects by viewModel.savedProjects.collectAsState()
-    val activeScriptId by viewModel.activeScriptId.collectAsState()
+    val projectName by viewModel.currentProjectName.collectAsStateWithLifecycle()
+    val isPreviewMode by viewModel.isPreviewMode.collectAsStateWithLifecycle()
+    val showGrid by viewModel.showGrid.collectAsStateWithLifecycle()
+    val snapToGrid by viewModel.snapToGrid.collectAsStateWithLifecycle()
+    val gridSize by viewModel.gridSize.collectAsStateWithLifecycle()
+    val screenWidth by viewModel.screenWidth.collectAsStateWithLifecycle()
+    val screenHeight by viewModel.screenHeight.collectAsStateWithLifecycle()
+    val savedProjects by viewModel.savedProjects.collectAsStateWithLifecycle()
+    val activeScriptId by viewModel.activeScriptId.collectAsStateWithLifecycle()
 
-    val useSingleDragMode by viewModel.useSingleDragMode.collectAsState()
-    val isTopbarVisible by viewModel.isTopbarVisible.collectAsState()
-    val showSettingsDialog by viewModel.showSettingsDialog.collectAsState()
-    val language by viewModel.language.collectAsState()
-    val uiScalePercent by viewModel.uiScalePercent.collectAsState()
-    val studioTheme by viewModel.studioTheme.collectAsState()
-    val canUndo by viewModel.canUndo.collectAsState()
-    val canRedo by viewModel.canRedo.collectAsState()
-    val arrowControlsEnabled by viewModel.arrowControlsEnabled.collectAsState()
-    val arrowStepPx by viewModel.arrowStepPx.collectAsState()
+    val useSingleDragMode by viewModel.useSingleDragMode.collectAsStateWithLifecycle()
+    val isTopbarVisible by viewModel.isTopbarVisible.collectAsStateWithLifecycle()
+    val showSettingsDialog by viewModel.showSettingsDialog.collectAsStateWithLifecycle()
+    val language by viewModel.language.collectAsStateWithLifecycle()
+    val uiScalePercent by viewModel.uiScalePercent.collectAsStateWithLifecycle()
+    val studioTheme by viewModel.studioTheme.collectAsStateWithLifecycle()
+    val canUndo by viewModel.canUndo.collectAsStateWithLifecycle()
+    val canRedo by viewModel.canRedo.collectAsStateWithLifecycle()
+    val arrowControlsEnabled by viewModel.arrowControlsEnabled.collectAsStateWithLifecycle()
+    val arrowStepPx by viewModel.arrowStepPx.collectAsStateWithLifecycle()
     val baseDensity = LocalDensity.current
     val densityScale = (uiScalePercent / 100f).coerceIn(0.4f, 1.4f)
     val themeColors = remember(studioTheme) { studioThemePalette(studioTheme) }
@@ -188,16 +192,17 @@ fun MainWorkspace(
         )
 	    ) {
 	    Box(modifier = modifier.fillMaxSize()) {
-	        if (showMainMenu) {
-	            ProjectLauncherScreen(
-	                projectName = projectName,
-	                savedProjects = savedProjects,
-	                themeColors = themeColors,
-	                onContinue = { showMainMenu = false },
-	                onNewProject = { showNewProjectDialog = true },
-	                onOpenProject = { showOpenProjectDialog = true },
-	                onLoadProject = {
-	                    viewModel.loadProject(it)
+            if (showMainMenu) {
+                ProjectLauncherScreen(
+                    projectName = projectName,
+                    savedProjects = savedProjects,
+                    themeColors = themeColors,
+                    isCompact = isCompact,
+                    onContinue = { showMainMenu = false },
+                    onNewProject = { showNewProjectDialog = true },
+                    onOpenProject = { showOpenProjectDialog = true },
+                    onLoadProject = {
+                        viewModel.loadProject(it)
 	                    activeScrollModeId = null
 	                    activePathModeId = null
 	                    showMainMenu = false
@@ -534,11 +539,12 @@ fun MainWorkspace(
             StudioStatusBar(
                 selectedObj = selectedObj,
                 projectName = projectName,
-	                canvasScale = canvasScale,
-	                canvasModeLabel = activePathObj?.let { "Path2D: ${it.name}" }
-	                    ?: activeScrollObj?.let { "Scrolling: ${it.name}" }
-	                    ?: "ScreenGui",
-	                showGrid = showGrid,
+                isCompact = isCompact,
+                canvasScale = canvasScale,
+                canvasModeLabel = activePathObj?.let { "Path2D: ${it.name}" }
+                    ?: activeScrollObj?.let { "Scrolling: ${it.name}" }
+                    ?: "ScreenGui",
+                showGrid = showGrid,
                 snapToGrid = snapToGrid
             )
         }
@@ -663,6 +669,7 @@ private fun ProjectLauncherScreen(
     projectName: String,
     savedProjects: List<ProjectEntity>,
     themeColors: StudioThemeColors,
+    isCompact: Boolean,
     onContinue: () -> Unit,
     onNewProject: () -> Unit,
     onOpenProject: () -> Unit,
@@ -674,105 +681,215 @@ private fun ProjectLauncherScreen(
             .background(Color(0xFF101318))
     ) {
         StudioTextureOverlay(modifier = Modifier.matchParentSize(), accent = themeColors.accent)
-        Row(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(22.dp),
-            horizontalArrangement = Arrangement.spacedBy(18.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(if (isCompact) 14.dp else 22.dp)
         ) {
-            Column(
-                modifier = Modifier
-                    .weight(0.92f)
-                    .fillMaxHeight()
-                    .liquidGlass(cornerRadius = 24.dp, tint = themeColors.accent, opacity = 0.13f)
-                    .padding(18.dp),
-                verticalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Image(
-                        painter = painterResource(id = R.drawable.vanilla_studio),
-                        contentDescription = "Vanilla",
-                        modifier = Modifier.size(58.dp)
-                    )
-                    Text("Vanilla Studio UI", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
-                    Text("Project menu", color = themeColors.accent, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                }
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Button(
-                        onClick = onContinue,
-                        colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent, contentColor = Color.White),
-                        shape = RoundedCornerShape(6.dp),
-                        modifier = Modifier.fillMaxWidth().height(44.dp)
-                    ) {
-                        Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Continue: $projectName", maxLines = 1, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                        OutlinedButton(
-                            onClick = onNewProject,
-                            shape = RoundedCornerShape(6.dp),
-                            modifier = Modifier.weight(1f).height(40.dp)
-                        ) {
-                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(15.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text("New", fontSize = 12.sp)
-                        }
-                        OutlinedButton(
-                            onClick = onOpenProject,
-                            shape = RoundedCornerShape(6.dp),
-                            modifier = Modifier.weight(1f).height(40.dp)
-                        ) {
-                            Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(15.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text("Open", fontSize = 12.sp)
-                        }
-                    }
-                }
-            }
-
-            Column(
-                modifier = Modifier
-                    .weight(1.38f)
-                    .fillMaxHeight()
-                    .liquidGlass(cornerRadius = 24.dp, tint = themeColors.accent, opacity = 0.11f)
-                    .padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Recent Projects", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                    Text("${savedProjects.size} saved", color = Color(0xFF8E96A3), fontSize = 11.sp)
-                }
-                if (savedProjects.isEmpty()) {
-                    Box(
+            val stackLayout = isCompact || maxWidth < 820.dp
+            if (stackLayout) {
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Column(
                         modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color(0xFF11151B), RoundedCornerShape(6.dp))
-                            .border(1.dp, Color(0xFF2E3540), RoundedCornerShape(6.dp)),
-                        contentAlignment = Alignment.Center
+                            .fillMaxWidth()
+                            .weight(0.88f)
+                            .liquidGlass(cornerRadius = 24.dp, tint = themeColors.accent, opacity = 0.13f)
+                            .padding(18.dp),
+                        verticalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("No local projects yet", color = Color(0xFF8E96A3), fontSize = 12.sp)
-                    }
-                } else {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.verticalScroll(rememberScrollState())) {
-                        savedProjects.take(8).forEach { project ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(54.dp)
-                                    .liquidGlass(cornerRadius = 14.dp, tint = themeColors.accent, opacity = 0.09f, strokeOpacity = 0.18f)
-                                    .clickable { onLoadProject(project) }
-                                    .padding(horizontal = 10.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Image(
+                                painter = painterResource(id = R.drawable.vanilla_studio),
+                                contentDescription = "Vanilla",
+                                modifier = Modifier.size(54.dp)
+                            )
+                            Text("Vanilla Studio UI", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                            Text("Project menu", color = themeColors.accent, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Button(
+                                onClick = onContinue,
+                                colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent, contentColor = Color.White),
+                                shape = RoundedCornerShape(6.dp),
+                                modifier = Modifier.fillMaxWidth().height(44.dp)
                             ) {
-                                Icon(Icons.Default.FolderOpen, contentDescription = null, tint = themeColors.accent, modifier = Modifier.size(20.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(project.name, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-                                    Text(project.description, color = Color(0xFF8E96A3), fontSize = 9.sp, maxLines = 1)
+                                Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text("Continue: $projectName", maxLines = 1, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                                OutlinedButton(
+                                    onClick = onNewProject,
+                                    shape = RoundedCornerShape(6.dp),
+                                    modifier = Modifier.weight(1f).height(40.dp)
+                                ) {
+                                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(15.dp))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("New", fontSize = 12.sp)
                                 }
-                                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color(0xFF8E96A3), modifier = Modifier.size(18.dp))
+                                OutlinedButton(
+                                    onClick = onOpenProject,
+                                    shape = RoundedCornerShape(6.dp),
+                                    modifier = Modifier.weight(1f).height(40.dp)
+                                ) {
+                                    Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(15.dp))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("Open", fontSize = 12.sp)
+                                }
+                            }
+                        }
+                    }
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1.12f)
+                            .liquidGlass(cornerRadius = 24.dp, tint = themeColors.accent, opacity = 0.11f)
+                            .padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Recent Projects", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                            Text("${savedProjects.size} saved", color = Color(0xFF8E96A3), fontSize = 11.sp)
+                        }
+                        if (savedProjects.isEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Color(0xFF11151B), RoundedCornerShape(6.dp))
+                                    .border(1.dp, Color(0xFF2E3540), RoundedCornerShape(6.dp)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("No local projects yet", color = Color(0xFF8E96A3), fontSize = 12.sp)
+                            }
+                        } else {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.verticalScroll(rememberScrollState())) {
+                                savedProjects.take(8).forEach { project ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(54.dp)
+                                            .liquidGlass(cornerRadius = 14.dp, tint = themeColors.accent, opacity = 0.09f, strokeOpacity = 0.18f)
+                                            .clickable { onLoadProject(project) }
+                                            .padding(horizontal = 10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        Icon(Icons.Default.FolderOpen, contentDescription = null, tint = themeColors.accent, modifier = Modifier.size(20.dp))
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(project.name, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                                            Text(project.description, color = Color(0xFF8E96A3), fontSize = 9.sp, maxLines = 1)
+                                        }
+                                        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color(0xFF8E96A3), modifier = Modifier.size(18.dp))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalArrangement = Arrangement.spacedBy(18.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .weight(0.92f)
+                            .fillMaxHeight()
+                            .liquidGlass(cornerRadius = 24.dp, tint = themeColors.accent, opacity = 0.13f)
+                            .padding(18.dp),
+                        verticalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Image(
+                                painter = painterResource(id = R.drawable.vanilla_studio),
+                                contentDescription = "Vanilla",
+                                modifier = Modifier.size(58.dp)
+                            )
+                            Text("Vanilla Studio UI", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+                            Text("Project menu", color = themeColors.accent, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Button(
+                                onClick = onContinue,
+                                colors = ButtonDefaults.buttonColors(containerColor = themeColors.accent, contentColor = Color.White),
+                                shape = RoundedCornerShape(6.dp),
+                                modifier = Modifier.fillMaxWidth().height(44.dp)
+                            ) {
+                                Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text("Continue: $projectName", maxLines = 1, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                                OutlinedButton(
+                                    onClick = onNewProject,
+                                    shape = RoundedCornerShape(6.dp),
+                                    modifier = Modifier.weight(1f).height(40.dp)
+                                ) {
+                                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(15.dp))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("New", fontSize = 12.sp)
+                                }
+                                OutlinedButton(
+                                    onClick = onOpenProject,
+                                    shape = RoundedCornerShape(6.dp),
+                                    modifier = Modifier.weight(1f).height(40.dp)
+                                ) {
+                                    Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(15.dp))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("Open", fontSize = 12.sp)
+                                }
+                            }
+                        }
+                    }
+
+                    Column(
+                        modifier = Modifier
+                            .weight(1.38f)
+                            .fillMaxHeight()
+                            .liquidGlass(cornerRadius = 24.dp, tint = themeColors.accent, opacity = 0.11f)
+                            .padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Recent Projects", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                            Text("${savedProjects.size} saved", color = Color(0xFF8E96A3), fontSize = 11.sp)
+                        }
+                        if (savedProjects.isEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Color(0xFF11151B), RoundedCornerShape(6.dp))
+                                    .border(1.dp, Color(0xFF2E3540), RoundedCornerShape(6.dp)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("No local projects yet", color = Color(0xFF8E96A3), fontSize = 12.sp)
+                            }
+                        } else {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.verticalScroll(rememberScrollState())) {
+                                savedProjects.take(8).forEach { project ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(54.dp)
+                                            .liquidGlass(cornerRadius = 14.dp, tint = themeColors.accent, opacity = 0.09f, strokeOpacity = 0.18f)
+                                            .clickable { onLoadProject(project) }
+                                            .padding(horizontal = 10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        Icon(Icons.Default.FolderOpen, contentDescription = null, tint = themeColors.accent, modifier = Modifier.size(20.dp))
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(project.name, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                                            Text(project.description, color = Color(0xFF8E96A3), fontSize = 9.sp, maxLines = 1)
+                                        }
+                                        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color(0xFF8E96A3), modifier = Modifier.size(18.dp))
+                                    }
+                                }
                             }
                         }
                     }
@@ -792,9 +909,9 @@ private fun StudioTextureOverlay(
             brush = Brush.linearGradient(
                 colors = listOf(
                     Color(0xFF08111F),
-                    Color(0xFF141827),
-                    Color(0xFF232044),
-                    Color(0xFF11131A)
+                    Color(0xFF121A2A),
+                    Color(0xFF161C2F),
+                    Color(0xFF0F131B)
                 ),
                 start = Offset.Zero,
                 end = Offset(size.width, size.height)
@@ -802,7 +919,7 @@ private fun StudioTextureOverlay(
         )
         drawRect(
             brush = Brush.radialGradient(
-                colors = listOf(accent.copy(alpha = 0.18f), Color.Transparent),
+                colors = listOf(accent.copy(alpha = 0.22f), Color.Transparent),
                 center = Offset(size.width * 0.14f, size.height * 0.08f),
                 radius = size.minDimension * 0.92f
             )
@@ -816,7 +933,7 @@ private fun StudioTextureOverlay(
         )
         drawRect(
             brush = Brush.radialGradient(
-                colors = listOf(Color(0xFF7DD3FC).copy(alpha = 0.10f), Color.Transparent),
+                colors = listOf(Color(0xFF7DD3FC).copy(alpha = 0.11f), Color.Transparent),
                 center = Offset(size.width * 0.72f, size.height * 0.90f),
                 radius = size.minDimension * 0.80f
             )
@@ -958,8 +1075,8 @@ private fun ArrowCluster(
         Text(title, color = Color(0xFF8E96A3), fontSize = 9.sp, fontWeight = FontWeight.Bold)
         TinyIconButton(Icons.Default.KeyboardArrowUp, accent, onUp)
         Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-            TinyIconButton(Icons.Default.KeyboardArrowLeft, accent, onLeft)
-            TinyIconButton(Icons.Default.KeyboardArrowRight, accent, onRight)
+            TinyIconButton(Icons.AutoMirrored.Filled.KeyboardArrowLeft, accent, onLeft)
+            TinyIconButton(Icons.AutoMirrored.Filled.KeyboardArrowRight, accent, onRight)
         }
         TinyIconButton(Icons.Default.KeyboardArrowDown, accent, onDown)
     }
@@ -1748,49 +1865,85 @@ private fun StudioSidebarRail(
 private fun StudioStatusBar(
     selectedObj: RobloxObject?,
     projectName: String,
+    isCompact: Boolean,
     canvasScale: Float,
     canvasModeLabel: String,
     showGrid: Boolean,
     snapToGrid: Boolean
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(28.dp)
-            .background(Color(0xFF202124))
-            .border(0.5.dp, Color(0xFF3D4148))
-            .padding(horizontal = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Text(
-            text = projectName,
-            color = Color(0xFFE7EAEE),
-            fontSize = 10.sp,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-            modifier = Modifier.weight(1f)
-        )
-        Text(
-            text = selectedObj?.let { "${it.className.name}: ${it.name}" } ?: "No selection",
-            color = Color(0xFFA6ACB3),
-            fontSize = 10.sp,
-            maxLines = 1,
-            modifier = Modifier.weight(1.4f)
-        )
-	        Text("Roblox Scale", color = Color(0xFFA6ACB3), fontSize = 10.sp)
-	        Text(canvasModeLabel, color = Color(0xFF8FBFF8), fontSize = 10.sp, maxLines = 1)
-	        Text("Zoom ${(canvasScale * 100).toInt()}%", color = Color(0xFFA6ACB3), fontSize = 10.sp)
-        Text(
-            text = if (showGrid) "Grid on" else "Grid off",
-            color = if (showGrid) Color(0xFF8FBFF8) else Color(0xFFA6ACB3),
-            fontSize = 10.sp
-        )
-        Text(
-            text = if (snapToGrid) "Snap on" else "Snap off",
-            color = if (snapToGrid) Color(0xFF8FBFF8) else Color(0xFFA6ACB3),
-            fontSize = 10.sp
-        )
+    if (isCompact) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color(0xFF202124))
+                .border(0.5.dp, Color(0xFF3D4148))
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = projectName,
+                    color = Color(0xFFE7EAEE),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    modifier = Modifier.weight(1f)
+                )
+                Text("Zoom ${(canvasScale * 100).toInt()}%", color = Color(0xFFA6ACB3), fontSize = 10.sp)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = selectedObj?.let { "${it.className.name}: ${it.name}" } ?: "No selection",
+                    color = Color(0xFFA6ACB3),
+                    fontSize = 10.sp,
+                    maxLines = 1,
+                    modifier = Modifier.weight(1.1f)
+                )
+                Text(canvasModeLabel, color = Color(0xFF8FBFF8), fontSize = 10.sp, maxLines = 1)
+                Text(if (showGrid) "Grid on" else "Grid off", color = if (showGrid) Color(0xFF8FBFF8) else Color(0xFFA6ACB3), fontSize = 10.sp)
+                Text(if (snapToGrid) "Snap on" else "Snap off", color = if (snapToGrid) Color(0xFF8FBFF8) else Color(0xFFA6ACB3), fontSize = 10.sp)
+            }
+        }
+    } else {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(28.dp)
+                .background(Color(0xFF202124))
+                .border(0.5.dp, Color(0xFF3D4148))
+                .padding(horizontal = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = projectName,
+                color = Color(0xFFE7EAEE),
+                fontSize = 10.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                modifier = Modifier.weight(1f)
+            )
+            Text(
+                text = selectedObj?.let { "${it.className.name}: ${it.name}" } ?: "No selection",
+                color = Color(0xFFA6ACB3),
+                fontSize = 10.sp,
+                maxLines = 1,
+                modifier = Modifier.weight(1.4f)
+            )
+            Text("Roblox Scale", color = Color(0xFFA6ACB3), fontSize = 10.sp)
+            Text(canvasModeLabel, color = Color(0xFF8FBFF8), fontSize = 10.sp, maxLines = 1)
+            Text("Zoom ${(canvasScale * 100).toInt()}%", color = Color(0xFFA6ACB3), fontSize = 10.sp)
+            Text(
+                text = if (showGrid) "Grid on" else "Grid off",
+                color = if (showGrid) Color(0xFF8FBFF8) else Color(0xFFA6ACB3),
+                fontSize = 10.sp
+            )
+            Text(
+                text = if (snapToGrid) "Snap on" else "Snap off",
+                color = if (snapToGrid) Color(0xFF8FBFF8) else Color(0xFFA6ACB3),
+                fontSize = 10.sp
+            )
+        }
     }
 }
 
